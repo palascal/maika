@@ -48,7 +48,7 @@ export function SeasonDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.removeItem("classement-tennis-players-v1");
+      localStorage.removeItem("maika-players-v1");
       localStorage.removeItem("maika-match-point-scoring-rules-v1");
     } catch {
       /* ignore */

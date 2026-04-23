@@ -68,7 +68,7 @@ Sans ce `role: "admin"`, l’utilisateur est traité comme **simple lecteur** da
 
 ## 4. Variables d’environnement sur votre machine
 
-1. À la racine du projet **`classement-tennis`**, créez un fichier **`.env.local`** (il est ignoré par Git grâce à `*.local` dans `.gitignore`).
+1. À la racine du projet **`maika`**, créez un fichier **`.env.local`** (il est ignoré par Git grâce à `*.local` dans `.gitignore`).
 2. Ajoutez (en remplaçant par vos valeurs réelles) :
 
 ```env
@@ -90,7 +90,7 @@ Vous pouvez vous inspirer de **`.env.example`** à la racine du projet (sans y m
 
 ## 5. Lancer l’application et se connecter
 
-1. Dans le dossier `classement-tennis` : `npm install` (une fois), puis `npm run dev`.
+1. Dans le dossier `maika` : `npm install` (une fois), puis `npm run dev`.
 2. Ouvrez l’URL indiquée par Vite (souvent `http://localhost:5173`).
 3. Page **Connexion** : utilisez l’**e-mail** et le **mot de passe** du compte Supabase créé à l’étape 3 (plus les identifiants `admin`/`admin` du mode JSON).
 

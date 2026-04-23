@@ -5,7 +5,7 @@ export interface AuthSession {
   role: AuthRole;
 }
 
-const SESSION_KEY = "classement-tennis-session-v1";
+const SESSION_KEY = "maika-session-v1";
 
 export function tryLogin(username: string, password: string): AuthSession | null {
   const u = username.trim().toLowerCase();

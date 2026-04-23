@@ -1,6 +1,6 @@
 # Spécifications — application « Maika » (classement pelote / doubles)
 
-Document destiné à un humain ou à une IA pour reprendre le projet sans parcourir tout le code. Dernière rédaction alignée sur le code du dossier `classement-tennis/`.
+Document destiné à un humain ou à une IA pour reprendre le projet sans parcourir tout le code. Dernière rédaction alignée sur le code du dossier `maika/`.
 
 ---
 
