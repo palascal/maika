@@ -1,0 +1,15 @@
+{
+  "startingSeasonPoints": 10,
+  "victoryOpponentMinusWinnerGte2": 5,
+  "victoryOpponentMinusWinnerGte1": 4,
+  "victoryOpponentMinusWinnerEq0": 3,
+  "victoryOpponentMinusWinnerLt0": 2,
+  "defeatWinnerMinusLoserGt0": -1,
+  "defeatWinnerMinusLoserEq0": -2,
+  "defeatWinnerMinusLoserEqMinus1": -3,
+  "defeatWinnerMinusLoserLteMinus2": -4,
+  "offensiveBonusMarginGt": 11,
+  "offensiveBonusPoints": 1,
+  "defensiveBonusMarginLt": 15,
+  "defensiveBonusPoints": 1
+}

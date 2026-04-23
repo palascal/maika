@@ -1,0 +1,104 @@
+{
+  "seasonId": "2026",
+  "updatedAt": "2026-04-21",
+  "matches": [
+    {
+      "id": "m-001",
+      "seasonId": "2026",
+      "status": "played",
+      "date": "2026-04-12",
+      "time": "10",
+      "venue": "Trinquet — Pau",
+      "teamA": [
+        "alice-martin",
+        "bob-leroy"
+      ],
+      "teamB": [
+        "chloe-bernard",
+        "david-nguyen"
+      ],
+      "scoreTeamA": 40,
+      "scoreTeamB": 25
+    },
+    {
+      "id": "m-002",
+      "seasonId": "2026",
+      "date": "2026-04-26",
+      "venue": "La Cancha",
+      "status": "played",
+      "teamA": [
+        "alice-martin",
+        "pingouin-alfred"
+      ],
+      "teamB": [
+        "bob-leroy",
+        "david-nguyen"
+      ],
+      "time": "14",
+      "scoreTeamA": 40,
+      "scoreTeamB": 21
+    },
+    {
+      "id": "match-1776779159397",
+      "seasonId": "2026",
+      "date": "2026-04-21",
+      "venue": "Toulouse",
+      "status": "scheduled",
+      "teamA": [
+        "pascal-marestin",
+        "pascal-marestin"
+      ],
+      "teamB": [
+        "chloe-bernard",
+        "bob-leroy"
+      ]
+    },
+    {
+      "id": "match-1776779742545",
+      "seasonId": "2026",
+      "date": "2026-04-21",
+      "venue": "",
+      "status": "played",
+      "teamA": [
+        "chloe-bernard",
+        "bob-leroy"
+      ],
+      "teamB": [
+        "pascal-marestin",
+        "alice-martin"
+      ],
+      "scoreTeamA": 40,
+      "scoreTeamB": 12
+    },
+    {
+      "id": "match-1776780404838",
+      "seasonId": "2026",
+      "date": "2026-04-21",
+      "venue": "",
+      "status": "scheduled",
+      "teamA": [
+        "pingouin-alfred",
+        "pascal-marestin"
+      ],
+      "teamB": [
+        "chloe-bernard",
+        "bob-leroy"
+      ]
+    },
+    {
+      "id": "match-1776780799093",
+      "seasonId": "2026",
+      "date": "2026-04-21",
+      "venue": "La Cancha2",
+      "status": "scheduled",
+      "teamA": [
+        "pingouin-alfred",
+        "chloe-bernard"
+      ],
+      "teamB": [
+        "bob-leroy",
+        "pascal-marestin"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,326 @@
+import type { CSSProperties, FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { maikaFromSeasonPoints } from "../domain/maika";
+import { collectPlayerIds, uniquePlayerId } from "../domain/playerId";
+import { posteLabel } from "../domain/ranking";
+import type { Player, PlayerPoste, PlayersFile } from "../domain/types";
+import { useSeasonData } from "../season/SeasonDataContext";
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+export function AdminPlayersPage() {
+  const { data, error, loading, savePlayersFile } = useSeasonData();
+  const [message, setMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  if (loading) return <p>Chargement…</p>;
+  if (error) return <p role="alert">Erreur : {error}</p>;
+  if (!data) return <p>Aucune donnée.</p>;
+
+  const file = data.players;
+
+  async function persist(nextPlayers: Player[]) {
+    const next: PlayersFile = {
+      ...file,
+      players: nextPlayers,
+      updatedAt: today(),
+    };
+    setSaveError(null);
+    setMessage(null);
+    setSaving(true);
+    try {
+      await savePlayersFile(next);
+      setMessage("Enregistré dans le fichier players.json du projet (via le serveur de dev ou preview).");
+    } catch (e: unknown) {
+      setSaveError(e instanceof Error ? e.message : "Enregistrement impossible.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <main>
+      <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>Gestion des joueurs</h2>
+      <p style={{ color: "var(--muted)", fontSize: "0.95rem", marginBottom: "1rem" }}>
+        En développement (<code>npm run dev</code>), les changements sont écrits dans{" "}
+        <code>public/data/players.json</code>. Après <code>npm run build</code>, utilisez{" "}
+        <code>npm run preview</code> pour enregistrer dans <code>dist/data/players.json</code>. Sur un hébergement
+        statique sans serveur, l’API d’enregistrement n’existe pas.
+      </p>
+      {message ? (
+        <p style={{ color: "var(--accent)", marginBottom: "1rem", fontSize: "0.95rem" }}>{message}</p>
+      ) : null}
+      {saveError ? (
+        <p role="alert" style={{ color: "#f87171", marginBottom: "1rem", fontSize: "0.95rem" }}>
+          {saveError}
+        </p>
+      ) : null}
+      {saving ? <p style={{ marginBottom: "1rem", color: "var(--muted)" }}>Enregistrement…</p> : null}
+      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+        {file.players.map((p) => (
+          <li key={p.id}>
+            <PlayerEditCard
+              player={p}
+              disabled={saving}
+              onSave={async (updated) => {
+                const idx = file.players.findIndex((x) => x.id === updated.id);
+                if (idx < 0) return;
+                const next = file.players.slice();
+                next[idx] = updated;
+                await persist(next);
+              }}
+            />
+          </li>
+        ))}
+      </ul>
+      <AddPlayerSection
+        playersFile={file}
+        startingSeasonPoints={data.scoring.startingSeasonPoints}
+        saving={saving}
+        onAdd={async (player) => {
+          await persist([...file.players, player]);
+        }}
+      />
+    </main>
+  );
+}
+
+function PlayerEditCard({
+  player,
+  disabled,
+  onSave,
+}: {
+  player: Player;
+  disabled?: boolean;
+  onSave: (p: Player) => void | Promise<void>;
+}) {
+  const [lastName, setLastName] = useState(player.lastName);
+  const [firstName, setFirstName] = useState(player.firstName);
+  const [poste, setPoste] = useState<PlayerPoste>(player.poste);
+  const [seasonPoints, setSeasonPoints] = useState(String(player.seasonPoints));
+
+  useEffect(() => {
+    setLastName(player.lastName);
+    setFirstName(player.firstName);
+    setPoste(player.poste);
+    setSeasonPoints(String(player.seasonPoints));
+  }, [player.id, player.lastName, player.firstName, player.poste, player.seasonPoints]);
+
+  const ptsPreview = Number(seasonPoints);
+  const maikaPreview = Number.isFinite(ptsPreview) ? maikaFromSeasonPoints(ptsPreview) : 0;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const pts = Number(seasonPoints);
+    if (!Number.isFinite(pts)) return;
+    await onSave({
+      ...player,
+      lastName: lastName.trim(),
+      firstName: firstName.trim(),
+      poste,
+      seasonPoints: Math.round(pts),
+    });
+  }
+
+  return (
+    <form
+      onSubmit={(e) => void submit(e)}
+      style={{
+        background: "var(--surface)",
+        borderRadius: 12,
+        padding: "1rem",
+        display: "grid",
+        gap: 10,
+        gridTemplateColumns: "1fr 1fr",
+      }}
+    >
+      <div style={{ gridColumn: "1 / -1", fontSize: "0.85rem", color: "var(--muted)" }}>
+        id : <code>{player.id}</code>
+      </div>
+      <label style={labelStyle}>
+        Nom
+        <input value={lastName} disabled={disabled} onChange={(e) => setLastName(e.target.value)} required style={inputStyle} />
+      </label>
+      <label style={labelStyle}>
+        Prénom
+        <input value={firstName} disabled={disabled} onChange={(e) => setFirstName(e.target.value)} required style={inputStyle} />
+      </label>
+      <label style={labelStyle}>
+        Poste
+        <select value={poste} disabled={disabled} onChange={(e) => setPoste(e.target.value as PlayerPoste)} style={inputStyle}>
+          <option value="avant">{posteLabel("avant")}</option>
+          <option value="arriere">{posteLabel("arriere")}</option>
+        </select>
+      </label>
+      <label style={labelStyle}>
+        Points
+        <input
+          type="number"
+          value={seasonPoints}
+          disabled={disabled}
+          onChange={(e) => setSeasonPoints(e.target.value)}
+          required
+          style={inputStyle}
+        />
+      </label>
+      <label style={labelStyle}>
+        Maika
+        <span style={readOnlyBoxStyle}>{maikaPreview}</span>
+      </label>
+      <button type="submit" disabled={disabled} style={{ ...buttonSecondary, gridColumn: "1 / -1" }}>
+        Enregistrer ce joueur
+      </button>
+    </form>
+  );
+}
+
+function AddPlayerSection({
+  playersFile,
+  startingSeasonPoints,
+  saving,
+  onAdd,
+}: {
+  playersFile: PlayersFile;
+  startingSeasonPoints: number;
+  saving: boolean;
+  onAdd: (p: Player) => void | Promise<void>;
+}) {
+  const [lastName, setLastName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [poste, setPoste] = useState<PlayerPoste>("avant");
+  const [seasonPoints, setSeasonPoints] = useState(() => String(startingSeasonPoints));
+
+  useEffect(() => {
+    setSeasonPoints(String(startingSeasonPoints));
+  }, [startingSeasonPoints]);
+
+  const existingIds = useMemo(() => collectPlayerIds(playersFile.players), [playersFile.players]);
+
+  const ptsAddPreview = Number(seasonPoints);
+  const maikaAddPreview = Number.isFinite(ptsAddPreview) ? maikaFromSeasonPoints(ptsAddPreview) : 0;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const ln = lastName.trim();
+    const fn = firstName.trim();
+    if (!ln || !fn) return;
+    const pts = Number(seasonPoints);
+    if (!Number.isFinite(pts)) return;
+    const id = uniquePlayerId(fn, ln, existingIds);
+    await onAdd({
+      id,
+      lastName: ln,
+      firstName: fn,
+      poste,
+      seasonPoints: Math.round(pts),
+    });
+    setLastName("");
+    setFirstName("");
+    setPoste("avant");
+    setSeasonPoints(String(startingSeasonPoints));
+  }
+
+  return (
+    <section style={{ marginTop: "1.5rem" }}>
+      <h3 style={{ fontSize: "1rem", marginTop: 0 }}>Ajouter un joueur</h3>
+      <form
+        onSubmit={(e) => void submit(e)}
+        style={{
+          background: "var(--surface)",
+          borderRadius: 12,
+          padding: "1rem",
+          display: "grid",
+          gap: 10,
+          gridTemplateColumns: "1fr 1fr",
+        }}
+      >
+        <label style={labelStyle}>
+          Nom
+          <input value={lastName} disabled={saving} onChange={(e) => setLastName(e.target.value)} required style={inputStyle} />
+        </label>
+        <label style={labelStyle}>
+          Prénom
+          <input value={firstName} disabled={saving} onChange={(e) => setFirstName(e.target.value)} required style={inputStyle} />
+        </label>
+        <label style={labelStyle}>
+          Poste
+          <select value={poste} disabled={saving} onChange={(e) => setPoste(e.target.value as PlayerPoste)} style={inputStyle}>
+            <option value="avant">{posteLabel("avant")}</option>
+            <option value="arriere">{posteLabel("arriere")}</option>
+          </select>
+        </label>
+        <label style={labelStyle}>
+          Points
+          <input
+            type="number"
+            value={seasonPoints}
+            disabled={saving}
+            onChange={(e) => setSeasonPoints(e.target.value)}
+            required
+            style={inputStyle}
+          />
+        </label>
+        <label style={labelStyle}>
+          Maika
+          <span style={readOnlyBoxStyle}>{maikaAddPreview}</span>
+        </label>
+        <button type="submit" disabled={saving} style={{ ...buttonPrimary, gridColumn: "1 / -1" }}>
+          Ajouter
+        </button>
+      </form>
+    </section>
+  );
+}
+
+const labelStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+  fontSize: "0.85rem",
+  color: "var(--muted)",
+};
+
+const readOnlyBoxStyle: CSSProperties = {
+  padding: "0.5rem 0.65rem",
+  borderRadius: 8,
+  border: "1px solid var(--muted)",
+  background: "var(--bg)",
+  color: "var(--text)",
+  fontSize: "1rem",
+  fontWeight: 700,
+  fontVariantNumeric: "tabular-nums",
+  minHeight: "2.5rem",
+  display: "flex",
+  alignItems: "center",
+  userSelect: "none",
+};
+
+const inputStyle: CSSProperties = {
+  padding: "0.5rem 0.65rem",
+  borderRadius: 8,
+  border: "1px solid var(--muted)",
+  background: "var(--bg)",
+  color: "var(--text)",
+  fontSize: "1rem",
+};
+
+const buttonSecondary: CSSProperties = {
+  padding: "0.55rem 1rem",
+  borderRadius: 8,
+  border: "1px solid var(--muted)",
+  background: "transparent",
+  color: "var(--text)",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const buttonPrimary: CSSProperties = {
+  padding: "0.55rem 1rem",
+  borderRadius: 8,
+  border: "none",
+  background: "var(--accent)",
+  color: "#0f172a",
+  fontWeight: 700,
+  cursor: "pointer",
+};

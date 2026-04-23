@@ -1,0 +1,49 @@
+{
+  "seasonId": "2026",
+  "seasonLabel": "Saison 2026",
+  "updatedAt": "2026-04-21",
+  "players": [
+    {
+      "id": "alice-martin",
+      "lastName": "Martin",
+      "firstName": "Alice",
+      "poste": "avant",
+      "seasonPoints": 10
+    },
+    {
+      "id": "bob-leroy",
+      "lastName": "Leroy",
+      "firstName": "Bob",
+      "poste": "arriere",
+      "seasonPoints": 10
+    },
+    {
+      "id": "chloe-bernard",
+      "lastName": "Bernard",
+      "firstName": "Chloé",
+      "poste": "avant",
+      "seasonPoints": 23
+    },
+    {
+      "id": "david-nguyen",
+      "lastName": "Nguyen",
+      "firstName": "David",
+      "poste": "arriere",
+      "seasonPoints": 10
+    },
+    {
+      "id": "pascal-marestin",
+      "lastName": "marestin",
+      "firstName": "pascal",
+      "poste": "arriere",
+      "seasonPoints": 10
+    },
+    {
+      "id": "pingouin-alfred",
+      "lastName": "VRT",
+      "firstName": "pingouin",
+      "poste": "avant",
+      "seasonPoints": 10
+    }
+  ]
+}
