@@ -24,6 +24,11 @@ export interface Player {
    * et des listes de sélection pour de nouvelles parties. Absent ou `true` = actif.
    */
   active?: boolean;
+  /**
+   * E-mail de contact ou de rattachement logique (optionnel). Indépendant du compte Supabase Auth
+   * sauf si vous alignez manuellement les adresses dans le dashboard.
+   */
+  email?: string;
 }
 
 /**

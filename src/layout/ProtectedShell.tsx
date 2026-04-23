@@ -33,6 +33,11 @@ function Nav() {
         Joueurs
       </NavLink>
       {isAdmin ? (
+        <NavLink to="/admin/joueurs" style={linkStyle}>
+          Admin joueurs
+        </NavLink>
+      ) : null}
+      {isAdmin ? (
         <NavLink to="/config" style={linkStyle}>
           Config
         </NavLink>

@@ -1,9 +1,9 @@
 import { useMemo, type CSSProperties } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { maikaFromSeasonPoints } from "../domain/maika";
 import { playerIsActive } from "../domain/playerActive";
 import { posteLabel, rankingByPoste } from "../domain/ranking";
-import { openAppPathInNewWindow } from "../navigation/openAppPathInNewWindow";
 import { useSeasonData } from "../season/SeasonDataContext";
 
 export function PlayersPage() {
@@ -34,15 +34,13 @@ export function PlayersPage() {
     <main>
       <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>Joueurs</h2>
       {isAdmin ? (
-        <div style={{ display: "flex", gap: 8, marginBottom: "0.8rem", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            style={buttonPrimary}
-            onClick={() => openAppPathInNewWindow("/joueurs/ajout")}
-            aria-label="Ajouter un joueur dans un nouvel onglet"
-          >
+        <div style={{ display: "flex", gap: 8, marginBottom: "0.8rem", flexWrap: "wrap", alignItems: "center" }}>
+          <Link to="/admin/joueurs?nouveau=1" style={{ ...buttonPrimary, textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" }} aria-label="Ouvrir l administration des joueurs pour ajouter">
             Ajouter
-          </button>
+          </Link>
+          <Link to="/admin/joueurs" style={{ ...buttonSecondary, textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.88rem" }}>
+            Administration
+          </Link>
         </div>
       ) : null}
       <div className="table-scroll">
@@ -69,14 +67,13 @@ export function PlayersPage() {
                 <td style={tdStyle}>{maikaFromSeasonPoints(p.seasonPoints)}</td>
                 {isAdmin ? (
                   <td style={tdStyle}>
-                    <button
-                      type="button"
-                      style={buttonSecondary}
-                      onClick={() => openAppPathInNewWindow(`/joueurs/${encodeURIComponent(p.id)}/modifier`)}
-                      aria-label={`Modifier ${p.firstName} ${p.lastName} dans un nouvel onglet`}
+                    <Link
+                      to={`/admin/joueurs?modifier=${encodeURIComponent(p.id)}`}
+                      style={{ ...buttonSecondary, textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                      aria-label={`Modifier ${p.firstName} ${p.lastName}`}
                     >
                       Modifier
-                    </button>
+                    </Link>
                   </td>
                 ) : null}
               </tr>
@@ -109,14 +106,13 @@ export function PlayersPage() {
                     <td style={tdStyle}>{posteLabel(p.poste)}</td>
                     <td style={tdStyle}>{p.seasonPoints}</td>
                     <td style={tdStyle}>
-                      <button
-                        type="button"
-                        style={buttonSecondary}
-                        onClick={() => openAppPathInNewWindow(`/joueurs/${encodeURIComponent(p.id)}/modifier`)}
+                      <Link
+                        to={`/admin/joueurs?modifier=${encodeURIComponent(p.id)}`}
+                        style={{ ...buttonSecondary, textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                         aria-label={`Modifier ${p.firstName} ${p.lastName}`}
                       >
                         Modifier / réactiver
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 ))}

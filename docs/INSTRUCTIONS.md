@@ -64,6 +64,18 @@ Sans ce `role: "admin"`, l’utilisateur est traité comme **simple lecteur** da
 
 **Important** : la clé **anon** est incluse dans le site publié ; la protection des écritures repose sur **Supabase RLS** et sur le fait que seuls les comptes avec `app_metadata.role = admin` peuvent modifier les données.
 
+### Connexion Google (optionnel)
+
+1. **Google Cloud Console** → APIs & Services → Credentials → **OAuth client ID** (type *Web application*).
+2. **Authorized JavaScript origins** : par ex. `https://palascal.github.io`, `http://localhost:5173`.
+3. **Authorized redirect URIs** : ajoutez l’URL indiquée par Supabase pour Google (souvent `https://<votre-ref>.supabase.co/auth/v1/callback` — voir la doc du provider dans le dashboard).
+4. **Supabase** → **Authentication** → **Providers** → **Google** : activer, coller **Client ID** et **Client Secret**.
+5. **Authentication** → **URL Configuration** :
+   - **Site URL** : l’URL publique de l’app (ex. `https://palascal.github.io/maika/` sur GitHub Pages).
+   - **Redirect URLs** : inclure au minimum l’URL du site et `http://localhost:5173/**` pour le dev local.
+
+Les utilisateurs créés via Google n’ont pas `app_metadata.role` par défaut : attribuez **`{ "role": "admin" }`** manuellement aux comptes autorisés à gérer les données (comme à l’étape 3).
+
 ---
 
 ## 4. Variables d’environnement sur votre machine
@@ -92,7 +104,7 @@ Vous pouvez vous inspirer de **`.env.example`** à la racine du projet (sans y m
 
 1. Dans le dossier `maika` : `npm install` (une fois), puis `npm run dev`.
 2. Ouvrez l’URL indiquée par Vite (souvent `http://localhost:5173`).
-3. Page **Connexion** : utilisez l’**e-mail** et le **mot de passe** du compte Supabase créé à l’étape 3 (plus les identifiants `admin`/`admin` du mode JSON).
+3. Page **Connexion** : e-mail / mot de passe, ou **Continuer avec Google** si le provider est activé (étape Google ci-dessus). En mode JSON local, comptes démo `admin` / `admin` et `user` / `user`.
 
 Si une erreur s’affiche au chargement des données, vérifiez que le SQL a bien été exécuté et qu’une ligne existe dans `seasons` pour l’id attendu (`2026` par défaut).
 
@@ -102,7 +114,7 @@ Si une erreur s’affiche au chargement des données, vérifiez que le SQL a bie
 
 Choisissez une ou plusieurs options :
 
-- **Saisie dans l’app** (recommandé au début) : connecté en admin, ajoutez joueurs, parties et barème comme en mode fichier.
+- **Saisie dans l’app** (recommandé au début) : connecté en admin, **Admin joueurs** (`/admin/joueurs`) pour la gestion complète (e-mail de contact, activation, recherche) ; pages **Joueurs** / **Parties** pour les classements et le calendrier. Le bouton **Ajouter** sur la page Joueurs ouvre la même administration.
 - **Table Editor Supabase** : remplissez `players`, `matches` (colonne `payload` = objet JSON d’une partie, comme dans `matches.json`), `scoring_config` (`payload` = objet plat comme `scoring-config.json`).
 - **Script SQL** : possible si vous convertissez vos JSON en `INSERT`.
 
@@ -155,6 +167,7 @@ Avec le workflow fourni dans `.github/workflows/deploy-pages.yml`, pensez aussi 
 | `supabase/migrations/001_maika_schema.sql` | Schéma + RLS + ligne saison par défaut |
 | `supabase/migrations/002_seed_from_local_json.sql` | Import initial des JSON (`public/data/*.json`) vers Supabase |
 | `supabase/migrations/003_players_active.sql` | Colonne `active` sur `players` (désactivation sans toucher aux parties) |
+| `supabase/migrations/004_players_email.sql` | Colonne optionnelle `email` sur `players` (contact / rattachement admin) |
 | `.env.example` | Modèle des variables (sans secrets) |
 | `docs/SPECS_MAIKA.md` | Spécifications fonctionnelles détaillées de l’app |
 

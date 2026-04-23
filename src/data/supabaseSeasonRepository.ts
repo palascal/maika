@@ -35,12 +35,15 @@ export async function loadSeasonFromSupabase(): Promise<SeasonBundle> {
   const players: Player[] = (playerRows ?? []).map((r) => {
     const rawActive = (r as { active?: boolean | null }).active;
     const active = rawActive === false ? false : true;
+    const rawEmail = (r as { email?: string | null }).email;
+    const email = typeof rawEmail === "string" && rawEmail.trim() ? rawEmail.trim().toLowerCase() : undefined;
     return {
       id: r.player_id as string,
       lastName: r.last_name as string,
       firstName: r.first_name as string,
       poste: r.poste as Player["poste"],
       seasonPoints: Number(r.season_points) || 0,
+      ...(email ? { email } : {}),
       ...(active ? {} : { active: false as const }),
     };
   });
@@ -103,6 +106,7 @@ export async function savePlayersToSupabase(file: PlayersFile): Promise<void> {
       poste: p.poste,
       season_points: Math.round(p.seasonPoints),
       active: playerIsActive(p),
+      email: p.email?.trim() ? p.email.trim().toLowerCase() : null,
     }));
     const { error: ins } = await sb.from("players").insert(rows);
     if (ins) throw sbError("Supabase (players insert) : ", ins.message);

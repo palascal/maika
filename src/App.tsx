@@ -1,13 +1,19 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { LoginPage } from "./auth/LoginPage";
 import { RequireAuth } from "./auth/RequireAuth";
 import { ProtectedShell } from "./layout/ProtectedShell";
 import { AdminConfigPage } from "./pages/AdminConfigPage";
+import { AdminPlayersManagementPage } from "./pages/AdminPlayersManagementPage";
 import { HomePage } from "./pages/HomePage";
 import { MatchFormPage } from "./pages/MatchFormPage";
 import { MatchesPage } from "./pages/MatchesPage";
-import { PlayerFormPage } from "./pages/PlayerFormPage";
 import { PlayersPage } from "./pages/PlayersPage";
+
+function RedirectAdminPlayerEdit() {
+  const { playerId } = useParams();
+  const to = playerId ? `/admin/joueurs?modifier=${encodeURIComponent(playerId)}` : "/admin/joueurs";
+  return <Navigate to={to} replace />;
+}
 
 export function App() {
   return (
@@ -20,8 +26,9 @@ export function App() {
           <Route path="parties/ajout" element={<MatchFormPage mode="add" />} />
           <Route path="parties/:matchId/modifier" element={<MatchFormPage mode="edit" />} />
           <Route path="joueurs" element={<PlayersPage />} />
-          <Route path="joueurs/ajout" element={<PlayerFormPage mode="add" />} />
-          <Route path="joueurs/:playerId/modifier" element={<PlayerFormPage mode="edit" />} />
+          <Route path="joueurs/ajout" element={<Navigate to="/admin/joueurs?nouveau=1" replace />} />
+          <Route path="joueurs/:playerId/modifier" element={<RedirectAdminPlayerEdit />} />
+          <Route path="admin/joueurs" element={<AdminPlayersManagementPage />} />
           <Route path="config" element={<AdminConfigPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

@@ -1,7 +1,9 @@
 import type { CSSProperties, FormEvent } from "react";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { getSupabaseClient } from "../lib/supabaseClient";
 import { isSupabaseConfigured } from "../lib/supabaseConfig";
+import { supabaseOAuthRedirectTo } from "../lib/oauthRedirect";
 import { useAuth } from "./AuthContext";
 
 export function LoginPage() {
@@ -13,6 +15,7 @@ export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [oauthBusy, setOauthBusy] = useState(false);
 
   if (session) {
     return <Navigate to={from === "/connexion" ? "/" : from} replace />;
@@ -29,14 +32,34 @@ export function LoginPage() {
     navigate(from === "/connexion" ? "/" : from, { replace: true });
   }
 
+  async function onGoogle() {
+    if (!isSupabaseConfigured()) return;
+    setError(null);
+    setOauthBusy(true);
+    try {
+      const sb = getSupabaseClient();
+      const { error: err } = await sb.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: supabaseOAuthRedirectTo() },
+      });
+      if (err) {
+        setError(err.message);
+        setOauthBusy(false);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Connexion Google impossible.");
+      setOauthBusy(false);
+    }
+  }
+
   return (
-    <main style={{ maxWidth: 400, margin: "2rem auto", padding: "0 1rem" }}>
+    <main style={{ maxWidth: 420, margin: "2rem auto", padding: "0 1rem" }}>
       <h1 style={{ fontSize: "1.35rem", marginTop: 0 }}>Connexion</h1>
       <p style={{ color: "var(--muted)", fontSize: "0.95rem", marginBottom: "1.25rem" }}>
         {isSupabaseConfigured() ? (
           <>
-            Connexion <strong>Supabase</strong> : e-mail et mot de passe du compte créé dans le projet (rôle admin via{" "}
-            <code>app_metadata.role</code>).
+            Compte <strong>Supabase</strong> : e-mail / mot de passe, ou Google si activé sur le projet. Les comptes Google
+            n’ont le rôle <strong>admin</strong> que si <code>app_metadata.role</code> est défini dans le tableau de bord.
           </>
         ) : (
           <>
@@ -87,6 +110,18 @@ export function LoginPage() {
           {authReady ? "Se connecter" : "Chargement…"}
         </button>
       </form>
+      {isSupabaseConfigured() ? (
+        <>
+          <div style={dividerWrapStyle}>
+            <span style={dividerLineStyle} />
+            <span style={dividerTextStyle}>ou</span>
+            <span style={dividerLineStyle} />
+          </div>
+          <button type="button" style={googleBtnStyle} disabled={!authReady || oauthBusy} onClick={() => void onGoogle()}>
+            {oauthBusy ? "Redirection…" : "Continuer avec Google"}
+          </button>
+        </>
+      ) : null}
     </main>
   );
 }
@@ -109,4 +144,31 @@ const buttonStyle: CSSProperties = {
   fontWeight: 700,
   cursor: "pointer",
   fontSize: "1rem",
+};
+
+const dividerWrapStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  margin: "1.25rem 0 0.75rem",
+};
+
+const dividerLineStyle: CSSProperties = { flex: 1, height: 1, background: "var(--muted)", opacity: 0.5 };
+
+const dividerTextStyle: CSSProperties = { color: "var(--muted)", fontSize: "0.82rem", fontWeight: 600 };
+
+const googleBtnStyle: CSSProperties = {
+  width: "100%",
+  padding: "0.65rem 1rem",
+  borderRadius: 10,
+  border: "1px solid var(--muted)",
+  background: "var(--bg)",
+  color: "var(--text)",
+  fontWeight: 600,
+  cursor: "pointer",
+  fontSize: "0.98rem",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
 };
