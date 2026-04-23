@@ -1,6 +1,7 @@
 import type { CSSProperties, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { maikaFromSeasonPoints } from "../domain/maika";
+import { playerIsActive } from "../domain/playerActive";
 import { collectPlayerIds, uniquePlayerId } from "../domain/playerId";
 import { posteLabel } from "../domain/ranking";
 import type { Player, PlayerPoste, PlayersFile } from "../domain/types";
@@ -99,13 +100,15 @@ function PlayerEditCard({
   const [firstName, setFirstName] = useState(player.firstName);
   const [poste, setPoste] = useState<PlayerPoste>(player.poste);
   const [seasonPoints, setSeasonPoints] = useState(String(player.seasonPoints));
+  const [active, setActive] = useState(playerIsActive(player));
 
   useEffect(() => {
     setLastName(player.lastName);
     setFirstName(player.firstName);
     setPoste(player.poste);
     setSeasonPoints(String(player.seasonPoints));
-  }, [player.id, player.lastName, player.firstName, player.poste, player.seasonPoints]);
+    setActive(playerIsActive(player));
+  }, [player.id, player.lastName, player.firstName, player.poste, player.seasonPoints, player.active]);
 
   const ptsPreview = Number(seasonPoints);
   const maikaPreview = Number.isFinite(ptsPreview) ? maikaFromSeasonPoints(ptsPreview) : 0;
@@ -120,6 +123,7 @@ function PlayerEditCard({
       firstName: firstName.trim(),
       poste,
       seasonPoints: Math.round(pts),
+      active,
     });
   }
 
@@ -137,6 +141,9 @@ function PlayerEditCard({
     >
       <div style={{ gridColumn: "1 / -1", fontSize: "0.85rem", color: "var(--muted)" }}>
         id : <code>{player.id}</code>
+        {playerIsActive(player) ? null : (
+          <span style={{ marginLeft: 8, color: "#fbbf24" }}>(désactivé — hors classements / nouvelles parties)</span>
+        )}
       </div>
       <label style={labelStyle}>
         Nom
@@ -167,6 +174,10 @@ function PlayerEditCard({
       <label style={labelStyle}>
         Maika
         <span style={readOnlyBoxStyle}>{maikaPreview}</span>
+      </label>
+      <label style={{ ...labelStyle, gridColumn: "1 / -1", flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <input type="checkbox" checked={active} disabled={disabled} onChange={(e) => setActive(e.target.checked)} />
+        <span>Joueur actif (classé et sélectionnable pour les nouvelles parties)</span>
       </label>
       <button type="submit" disabled={disabled} style={{ ...buttonSecondary, gridColumn: "1 / -1" }}>
         Enregistrer ce joueur
@@ -214,6 +225,7 @@ function AddPlayerSection({
       firstName: fn,
       poste,
       seasonPoints: Math.round(pts),
+      active: true,
     });
     setLastName("");
     setFirstName("");

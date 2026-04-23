@@ -1,13 +1,14 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { formatDateLongFr, formatMatchHourDisplay, formatMatchLine, playerById, playerFullName } from "../domain/format";
 import { maikaFromSeasonPoints } from "../domain/maika";
+import { playerIsActive } from "../domain/playerActive";
 import { posteLabel, rankingByPoste } from "../domain/ranking";
 import type { Player } from "../domain/types";
 import { useSeasonData } from "../season/SeasonDataContext";
 
 function sortedForLeaderboard(players: Player[], poste: Player["poste"]): Player[] {
   return players
-    .filter((p) => p.poste === poste)
+    .filter((p) => p.poste === poste && playerIsActive(p))
     .slice()
     .sort((a, b) => {
       if (b.seasonPoints !== a.seasonPoints) return b.seasonPoints - a.seasonPoints;

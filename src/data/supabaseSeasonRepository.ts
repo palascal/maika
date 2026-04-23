@@ -5,6 +5,7 @@ import {
   parseSeasonScoringFromUnknown,
   type SeasonScoringConfig,
 } from "./seasonScoringConfigStorage";
+import { playerIsActive } from "../domain/playerActive";
 import type { Match, MatchesFile, Player, PlayersFile } from "../domain/types";
 import type { SeasonBundle } from "../season/seasonTypes";
 
@@ -31,13 +32,18 @@ export async function loadSeasonFromSupabase(): Promise<SeasonBundle> {
   const { data: playerRows, error: pErr } = await sb.from("players").select("*").eq("season_id", seasonId);
   if (pErr) throw sbError("Supabase (players) : ", pErr.message);
 
-  const players: Player[] = (playerRows ?? []).map((r) => ({
-    id: r.player_id as string,
-    lastName: r.last_name as string,
-    firstName: r.first_name as string,
-    poste: r.poste as Player["poste"],
-    seasonPoints: Number(r.season_points) || 0,
-  }));
+  const players: Player[] = (playerRows ?? []).map((r) => {
+    const rawActive = (r as { active?: boolean | null }).active;
+    const active = rawActive === false ? false : true;
+    return {
+      id: r.player_id as string,
+      lastName: r.last_name as string,
+      firstName: r.first_name as string,
+      poste: r.poste as Player["poste"],
+      seasonPoints: Number(r.season_points) || 0,
+      ...(active ? {} : { active: false as const }),
+    };
+  });
 
   const { data: matchRows, error: mErr } = await sb.from("matches").select("payload").eq("season_id", seasonId);
   if (mErr) throw sbError("Supabase (matches) : ", mErr.message);
@@ -96,6 +102,7 @@ export async function savePlayersToSupabase(file: PlayersFile): Promise<void> {
       first_name: p.firstName,
       poste: p.poste,
       season_points: Math.round(p.seasonPoints),
+      active: playerIsActive(p),
     }));
     const { error: ins } = await sb.from("players").insert(rows);
     if (ins) throw sbError("Supabase (players insert) : ", ins.message);

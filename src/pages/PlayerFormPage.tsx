@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { maikaFromSeasonPoints } from "../domain/maika";
 import { collectPlayerIds, uniquePlayerId } from "../domain/playerId";
+import { playerIsActive } from "../domain/playerActive";
 import { posteLabel } from "../domain/ranking";
 import type { Player, PlayerPoste, PlayersFile } from "../domain/types";
 import { useSeasonData } from "../season/SeasonDataContext";
@@ -99,6 +100,7 @@ function PlayerForm({
   const [seasonPoints, setSeasonPoints] = useState(
     () => (editingPlayer ? String(editingPlayer.seasonPoints) : String(startingSeasonPoints)),
   );
+  const [active, setActive] = useState(() => (editingPlayer ? playerIsActive(editingPlayer) : true));
 
   useEffect(() => {
     if (editingPlayer) {
@@ -106,11 +108,13 @@ function PlayerForm({
       setFirstName(editingPlayer.firstName);
       setPoste(editingPlayer.poste);
       setSeasonPoints(String(editingPlayer.seasonPoints));
+      setActive(playerIsActive(editingPlayer));
     } else {
       setLastName("");
       setFirstName("");
       setPoste("avant");
       setSeasonPoints(String(startingSeasonPoints));
+      setActive(true);
     }
   }, [editingPlayerId, editingPlayer, startingSeasonPoints]);
 
@@ -125,13 +129,15 @@ function PlayerForm({
     if (!ln || !fn || !Number.isFinite(pts)) return;
     if (editingPlayer) {
       const next = players.map((p) =>
-        p.id === editingPlayer.id ? { ...p, lastName: ln, firstName: fn, poste, seasonPoints: Math.round(pts) } : p,
+        p.id === editingPlayer.id
+          ? { ...p, lastName: ln, firstName: fn, poste, seasonPoints: Math.round(pts), active }
+          : p,
       );
       await onSubmit(next);
       return;
     }
     const id = uniquePlayerId(fn, ln, collectPlayerIds(players));
-    await onSubmit([...players, { id, lastName: ln, firstName: fn, poste, seasonPoints: Math.round(pts) }]);
+    await onSubmit([...players, { id, lastName: ln, firstName: fn, poste, seasonPoints: Math.round(pts), active: true }]);
   }
 
   return (
@@ -162,6 +168,12 @@ function PlayerForm({
             {maikaPreview}
           </span>
         </label>
+        {editingPlayer ? (
+          <label style={{ ...labelStyle, gridColumn: "1 / -1", flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <input type="checkbox" checked={active} disabled={saving} onChange={(e) => setActive(e.target.checked)} />
+            <span>Joueur actif (classé et sélectionnable pour les nouvelles parties)</span>
+          </label>
+        ) : null}
       </div>
       <div className="form-actions">
         <button type="submit" disabled={saving} style={buttonPrimary}>

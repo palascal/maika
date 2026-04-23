@@ -1,6 +1,7 @@
 import { useMemo, type CSSProperties } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { maikaFromSeasonPoints } from "../domain/maika";
+import { playerIsActive } from "../domain/playerActive";
 import { posteLabel, rankingByPoste } from "../domain/ranking";
 import { openAppPathInNewWindow } from "../navigation/openAppPathInNewWindow";
 import { useSeasonData } from "../season/SeasonDataContext";
@@ -11,21 +12,23 @@ export function PlayersPage() {
 
   const ranks = useMemo(() => {
     if (!data) return null;
-    const list = data.players.players;
     return {
-      avant: rankingByPoste(list, "avant"),
-      arriere: rankingByPoste(list, "arriere"),
+      avant: rankingByPoste(data.players.players, "avant"),
+      arriere: rankingByPoste(data.players.players, "arriere"),
     };
   }, [data]);
 
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data || !ranks) return <p>Chargement…</p>;
 
-  const ordered = data.players.players.slice().sort((a, b) => {
-    const byLast = a.lastName.localeCompare(b.lastName, "fr");
-    if (byLast !== 0) return byLast;
-    return a.firstName.localeCompare(b.firstName, "fr");
-  });
+  const sortPlayers = (list: typeof data.players.players) =>
+    list.slice().sort((a, b) => {
+      const byLast = a.lastName.localeCompare(b.lastName, "fr");
+      if (byLast !== 0) return byLast;
+      return a.firstName.localeCompare(b.firstName, "fr");
+    });
+  const orderedActive = sortPlayers(data.players.players.filter(playerIsActive));
+  const orderedInactive = sortPlayers(data.players.players.filter((p) => !playerIsActive(p)));
 
   return (
     <main>
@@ -56,7 +59,7 @@ export function PlayersPage() {
             </tr>
           </thead>
           <tbody>
-            {ordered.map((p) => (
+            {orderedActive.map((p) => (
               <tr key={p.id}>
                 <td style={tdStyle}>{p.lastName}</td>
                 <td style={tdStyle}>{p.firstName}</td>
@@ -81,6 +84,47 @@ export function PlayersPage() {
           </tbody>
         </table>
       </div>
+      {isAdmin && orderedInactive.length > 0 ? (
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3 style={{ fontSize: "1rem", marginTop: 0, color: "var(--muted)" }}>Joueurs désactivés (historique conservé)</h3>
+          <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginBottom: "0.75rem" }}>
+            Non visibles dans les classements ni sélectionnables pour de nouvelles parties. Les parties passées restent inchangées.
+          </p>
+          <div className="table-scroll">
+            <table style={{ ...tableStyle, opacity: 0.92 }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Nom</th>
+                  <th style={thStyle}>Prénom</th>
+                  <th style={thStyle}>Poste</th>
+                  <th style={thStyle}>Points</th>
+                  <th style={thStyle}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderedInactive.map((p) => (
+                  <tr key={p.id}>
+                    <td style={tdStyle}>{p.lastName}</td>
+                    <td style={tdStyle}>{p.firstName}</td>
+                    <td style={tdStyle}>{posteLabel(p.poste)}</td>
+                    <td style={tdStyle}>{p.seasonPoints}</td>
+                    <td style={tdStyle}>
+                      <button
+                        type="button"
+                        style={buttonSecondary}
+                        onClick={() => openAppPathInNewWindow(`/joueurs/${encodeURIComponent(p.id)}/modifier`)}
+                        aria-label={`Modifier ${p.firstName} ${p.lastName}`}
+                      >
+                        Modifier / réactiver
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

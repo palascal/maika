@@ -19,6 +19,11 @@ export interface Player {
    * Le Maika affiché est la partie entière de `seasonPoints / 10` (voir `maikaFromSeasonPoints`).
    */
   seasonPoints: number;
+  /**
+   * Si `false`, le joueur reste en base pour l’historique des parties mais est exclu des classements
+   * et des listes de sélection pour de nouvelles parties. Absent ou `true` = actif.
+   */
+  active?: boolean;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { playerIsActive } from "./playerActive";
 import type { Player, PlayerId, PlayerPoste } from "./types";
 
 function comparePlayersForRanking(a: Player, b: Player): number {
@@ -7,9 +8,9 @@ function comparePlayersForRanking(a: Player, b: Player): number {
   return a.firstName.localeCompare(b.firstName, "fr");
 }
 
-/** Classement dense par poste : même nombre de points = même rang (1, 1, 2…). */
+/** Classement dense par poste : même nombre de points = même rang (1, 1, 2…). Joueurs désactivés exclus. */
 export function rankingByPoste(players: Player[], poste: PlayerPoste): Map<PlayerId, number> {
-  const subset = players.filter((p) => p.poste === poste).slice().sort(comparePlayersForRanking);
+  const subset = players.filter((p) => p.poste === poste && playerIsActive(p)).slice().sort(comparePlayersForRanking);
   const map = new Map<PlayerId, number>();
   let rank = 1;
 

@@ -6,6 +6,7 @@ import {
   MATCH_HOUR_VALUES,
   normalizeMatchHour,
 } from "../domain/format";
+import { playerIsActive } from "../domain/playerActive";
 import type { Match, MatchStatus, MatchesFile, PlayerId } from "../domain/types";
 import { useSeasonData } from "../season/SeasonDataContext";
 
@@ -26,13 +27,19 @@ export function MatchFormPage({ mode }: { mode: Mode }) {
     if (!isAdmin) navigate("/parties", { replace: true });
   }, [isAdmin, navigate]);
 
-  const players = useMemo(
-    () =>
-      (data?.players.players ?? [])
-        .slice()
-        .sort((a, b) => a.lastName.localeCompare(b.lastName, "fr") || a.firstName.localeCompare(b.firstName, "fr")),
-    [data?.players.players],
-  );
+  const players = useMemo(() => {
+    const all = data?.players.players ?? [];
+    const inEditingMatch =
+      mode === "edit" && matchId ? data.matches.matches.find((m) => m.id === matchId) : undefined;
+    const allowInactive = new Set<PlayerId>();
+    if (inEditingMatch) {
+      for (const id of [...inEditingMatch.teamA, ...inEditingMatch.teamB]) allowInactive.add(id);
+    }
+    return all
+      .filter((p) => playerIsActive(p) || allowInactive.has(p.id))
+      .slice()
+      .sort((a, b) => a.lastName.localeCompare(b.lastName, "fr") || a.firstName.localeCompare(b.firstName, "fr"));
+  }, [data?.players.players, data?.matches.matches, mode, matchId]);
 
   if (!isAdmin) return null;
   if (error) return <p role="alert">Erreur : {error}</p>;

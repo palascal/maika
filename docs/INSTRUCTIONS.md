@@ -154,6 +154,7 @@ Avec le workflow fourni dans `.github/workflows/deploy-pages.yml`, pensez aussi 
 |---------|---------|
 | `supabase/migrations/001_maika_schema.sql` | Schéma + RLS + ligne saison par défaut |
 | `supabase/migrations/002_seed_from_local_json.sql` | Import initial des JSON (`public/data/*.json`) vers Supabase |
+| `supabase/migrations/003_players_active.sql` | Colonne `active` sur `players` (désactivation sans toucher aux parties) |
 | `.env.example` | Modèle des variables (sans secrets) |
 | `docs/SPECS_MAIKA.md` | Spécifications fonctionnelles détaillées de l’app |
 
