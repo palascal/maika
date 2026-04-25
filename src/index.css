@@ -53,3 +53,13 @@ a {
   flex: 1 1 8rem;
   max-width: 100%;
 }
+
+@keyframes maika-icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-icon-spin {
+  animation: maika-icon-spin 0.65s linear infinite;
+}

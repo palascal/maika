@@ -3,6 +3,7 @@ export type PlayerId = string;
 
 /** Poste au filet (avant) ou au fond de court (arrière) — deux classements distincts. */
 export type PlayerPoste = "avant" | "arriere";
+export type PlayerAccessRole = "user" | "orga" | "admin";
 
 /** Une équipe de double = exactement 2 joueurs. */
 export type DoublesTeam = readonly [PlayerId, PlayerId];
@@ -29,6 +30,11 @@ export interface Player {
    * sauf si vous alignez manuellement les adresses dans le dashboard.
    */
   email?: string;
+  /**
+   * Rôle applicatif à propager dans Supabase Auth (`app_metadata.role`) pour le compte lié à `email`.
+   * Si absent, la valeur effective est "user".
+   */
+  authRole?: PlayerAccessRole;
 }
 
 /**

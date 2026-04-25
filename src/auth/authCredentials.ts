@@ -1,8 +1,8 @@
-export type AuthRole = "admin" | "user";
+import type { AppRole } from "../lib/accessRoles";
 
 export interface AuthSession {
   username: string;
-  role: AuthRole;
+  role: AppRole;
 }
 
 const SESSION_KEY = "maika-session-v1";
@@ -10,6 +10,7 @@ const SESSION_KEY = "maika-session-v1";
 export function tryLogin(username: string, password: string): AuthSession | null {
   const u = username.trim().toLowerCase();
   if (u === "admin" && password === "admin") return { username: "admin", role: "admin" };
+  if (u === "orga" && password === "orga") return { username: "orga", role: "orga" };
   if (u === "user" && password === "user") return { username: "user", role: "user" };
   return null;
 }
@@ -21,7 +22,7 @@ export function readStoredSession(): AuthSession | null {
     const o: unknown = JSON.parse(raw);
     if (!o || typeof o !== "object") return null;
     const s = o as { username?: string; role?: string };
-    if (s.role !== "admin" && s.role !== "user") return null;
+    if (s.role !== "admin" && s.role !== "orga" && s.role !== "user") return null;
     if (typeof s.username !== "string") return null;
     return { username: s.username, role: s.role };
   } catch {

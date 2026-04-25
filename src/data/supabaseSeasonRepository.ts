@@ -8,6 +8,7 @@ import {
 import { playerIsActive } from "../domain/playerActive";
 import type { Match, MatchesFile, Player, PlayersFile } from "../domain/types";
 import type { SeasonBundle } from "../season/seasonTypes";
+import { normalizeAppRole } from "../lib/accessRoles";
 
 function sbError(prefix: string, message: string | null): Error {
   return new Error(`${prefix}${message ?? "Erreur inconnue"}`);
@@ -37,6 +38,8 @@ export async function loadSeasonFromSupabase(): Promise<SeasonBundle> {
     const active = rawActive === false ? false : true;
     const rawEmail = (r as { email?: string | null }).email;
     const email = typeof rawEmail === "string" && rawEmail.trim() ? rawEmail.trim().toLowerCase() : undefined;
+    const rawRole = (r as { auth_role?: string | null }).auth_role;
+    const authRole = typeof rawRole === "string" && rawRole.trim() ? normalizeAppRole(rawRole.trim().toLowerCase()) : "user";
     return {
       id: r.player_id as string,
       lastName: r.last_name as string,
@@ -44,6 +47,7 @@ export async function loadSeasonFromSupabase(): Promise<SeasonBundle> {
       poste: r.poste as Player["poste"],
       seasonPoints: Number(r.season_points) || 0,
       ...(email ? { email } : {}),
+      ...(authRole !== "user" ? { authRole } : {}),
       ...(active ? {} : { active: false as const }),
     };
   });
@@ -107,6 +111,7 @@ export async function savePlayersToSupabase(file: PlayersFile): Promise<void> {
       season_points: Math.round(p.seasonPoints),
       active: playerIsActive(p),
       email: p.email?.trim() ? p.email.trim().toLowerCase() : null,
+      auth_role: p.authRole ?? "user",
     }));
     const { error: ins } = await sb.from("players").insert(rows);
     if (ins) throw sbError("Supabase (players insert) : ", ins.message);

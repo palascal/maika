@@ -1,12 +1,17 @@
-import { useState, type CSSProperties } from "react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { IconActionButton, iconButtonBaseStyle } from "../components/IconActionButton";
 import {
+  formatDateDayMonthFr,
   formatDateLongFr,
   formatMatchHourDisplay,
   formatTeamLabel,
   playerById,
 } from "../domain/format";
-import { hasPeloteScore } from "../domain/matchScore";
+import { formatPeloteScore, hasPeloteScore } from "../domain/matchScore";
+import { maikaFromSeasonPoints } from "../domain/maika";
+import { matchPointDeltasForPlayedMatch, mergeScoringRules, type MatchPointScoringRules } from "../domain/matchPointScoring";
 import type { Match, MatchStatus, Player, PlayerId } from "../domain/types";
 import { openAppPathInNewWindow } from "../navigation/openAppPathInNewWindow";
 import { useSeasonData } from "../season/SeasonDataContext";
@@ -37,6 +42,26 @@ const compositionRowB: CSSProperties = {
 const compositionNamesStyle: CSSProperties = { flex: "1 1 8rem", minWidth: 0 };
 const compositionScoreStyle: CSSProperties = { fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 };
 
+const matchWhenWhereLine1Style: CSSProperties = { fontWeight: 600, fontSize: "0.92rem", lineHeight: 1.35 };
+const matchWhenWhereLine2Style: CSSProperties = {
+  marginTop: 4,
+  fontSize: "0.82rem",
+  color: "var(--muted)",
+  lineHeight: 1.35,
+};
+
+function MatchWhenWhereCell({ m }: { m: Match }) {
+  const dateStr = formatDateDayMonthFr(m.date);
+  const timeStr = m.time ? formatMatchHourDisplay(m.time) : "—";
+  const venueStr = m.venue?.trim() ? m.venue.trim() : "—";
+  return (
+    <td style={tdStyle}>
+      <div style={matchWhenWhereLine1Style}>{dateStr}</div>
+      <div style={matchWhenWhereLine2Style}>{`${timeStr}\u00a0·\u00a0${venueStr}`}</div>
+    </td>
+  );
+}
+
 function MatchCompositionCell({ m, map }: { m: Match; map: Map<PlayerId, Player> }) {
   const scored = hasPeloteScore(m);
   return (
@@ -55,11 +80,79 @@ function MatchCompositionCell({ m, map }: { m: Match; map: Map<PlayerId, Player>
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+type MatchDebug = {
+  levelGapEq1MinusEq2: number | null;
+  scoreGap: number | null;
+  winEq1: number | null;
+  loseEq1: number | null;
+  winEq2: number | null;
+  loseEq2: number | null;
+};
+
+function victoryPoints(opponentMinusWinner: number, rules: MatchPointScoringRules): number {
+  if (opponentMinusWinner >= 2) return rules.victoryOpponentMinusWinnerGte2;
+  if (opponentMinusWinner >= 1) return rules.victoryOpponentMinusWinnerGte1;
+  if (opponentMinusWinner === 0) return rules.victoryOpponentMinusWinnerEq0;
+  return rules.victoryOpponentMinusWinnerLt0;
+}
+
+function defeatPoints(winnerMinusLoser: number, rules: MatchPointScoringRules): number {
+  if (winnerMinusLoser > 0) return rules.defeatWinnerMinusLoserGt0;
+  if (winnerMinusLoser > -1) return rules.defeatWinnerMinusLoserEq0;
+  if (winnerMinusLoser >= -2) return rules.defeatWinnerMinusLoserEqMinus1;
+  return rules.defeatWinnerMinusLoserLteMinus2;
+}
+
 export function MatchesPage() {
   const { data, error, loading, saveMatchesFile } = useSeasonData();
-  const { isAdmin } = useAuth();
+  const { canManageLeague, isAdmin } = useAuth();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  /** Toujours appelé (même en chargement) — ne pas placer après un return conditionnel. */
+  const debugByMatchId = useMemo(() => {
+    const out = new Map<string, MatchDebug>();
+    if (!data) return out;
+    const rules = mergeScoringRules(data.scoring.rules);
+    const points = new Map<PlayerId, number>();
+    const start = data.scoring.startingSeasonPoints;
+    for (const p of data.players.players) points.set(p.id, start);
+    const ordered = data.matches.matches.slice().sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    for (const m of ordered) {
+      if (m.status !== "played" || !hasPeloteScore(m) || m.scoreTeamA === m.scoreTeamB) {
+        out.set(m.id, {
+          levelGapEq1MinusEq2: null,
+          scoreGap: null,
+          winEq1: null,
+          loseEq1: null,
+          winEq2: null,
+          loseEq2: null,
+        });
+        continue;
+      }
+      const maikaEq1 = maikaFromSeasonPoints(points.get(m.teamA[0]) ?? 0) + maikaFromSeasonPoints(points.get(m.teamA[1]) ?? 0);
+      const maikaEq2 = maikaFromSeasonPoints(points.get(m.teamB[0]) ?? 0) + maikaFromSeasonPoints(points.get(m.teamB[1]) ?? 0);
+      const eq1Wins = (m.scoreTeamA ?? 0) > (m.scoreTeamB ?? 0);
+      const maikaWinner = eq1Wins ? maikaEq1 : maikaEq2;
+      const maikaLoser = eq1Wins ? maikaEq2 : maikaEq1;
+      const winPts = victoryPoints(maikaLoser - maikaWinner, rules);
+      const losePts = defeatPoints(maikaWinner - maikaLoser, rules);
+      const deltas = matchPointDeltasForPlayedMatch(m, points, rules);
+      out.set(m.id, {
+        levelGapEq1MinusEq2: maikaEq1 - maikaEq2,
+        scoreGap: Math.abs((m.scoreTeamA ?? 0) - (m.scoreTeamB ?? 0)),
+        winEq1: eq1Wins ? winPts : null,
+        loseEq1: eq1Wins ? null : losePts,
+        winEq2: eq1Wins ? null : winPts,
+        loseEq2: eq1Wins ? losePts : null,
+      });
+      for (const [id, d] of deltas) {
+        if (!points.has(id)) continue;
+        points.set(id, (points.get(id) ?? 0) + d);
+      }
+    }
+    return out;
+  }, [data]);
 
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data) return <p>Chargement…</p>;
@@ -96,16 +189,15 @@ export function MatchesPage() {
           {deleteError}
         </p>
       ) : null}
-      {isAdmin ? (
+      {canManageLeague ? (
         <div style={{ display: "flex", gap: 8, marginBottom: "0.8rem", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            style={buttonPrimary}
+          <IconActionButton
+            label="Ajouter une partie dans un nouvel onglet"
+            icon={Plus}
+            iconSize={20}
+            style={{ ...iconButtonBaseStyle, ...buttonPrimary, border: "none" }}
             onClick={() => openAppPathInNewWindow("/parties/ajout")}
-            aria-label="Ajouter une partie dans un nouvel onglet"
-          >
-            Ajouter
-          </button>
+          />
         </div>
       ) : null}
       <div className="table-scroll">
@@ -113,42 +205,56 @@ export function MatchesPage() {
           <thead>
             <tr>
               <th style={thStyle}>Date</th>
-              <th style={thStyle}>Heure</th>
-              <th style={thStyle}>Lieu</th>
               <th style={thStyle}>Composition</th>
+              <th style={thStyle}>Score</th>
               <th style={thStyle}>Statut</th>
-              {isAdmin ? <th style={thStyle}>Action</th> : null}
+              {isAdmin ? <th style={thStyle}>Écart niveau</th> : null}
+              {isAdmin ? <th style={thStyle}>Écart score</th> : null}
+              {isAdmin ? <th style={thStyle}>Pts victoire Eq1</th> : null}
+              {isAdmin ? <th style={thStyle}>Pts défaite Eq1</th> : null}
+              {isAdmin ? <th style={thStyle}>Pts victoire Eq2</th> : null}
+              {isAdmin ? <th style={thStyle}>Pts défaite Eq2</th> : null}
+              {canManageLeague ? <th style={thStyle}>Action</th> : null}
             </tr>
           </thead>
           <tbody>
             {list.map((m) => (
               <tr key={m.id}>
-                <td style={tdStyle}>{formatDateLongFr(m.date)}</td>
-                <td style={tdStyle}>{m.time ? formatMatchHourDisplay(m.time) : "-"}</td>
-                <td style={tdStyle}>{m.venue || "-"}</td>
+                <MatchWhenWhereCell m={m} />
                 <td style={tdStyle}>
                   <MatchCompositionCell m={m} map={map} />
                 </td>
+                <td style={tdStyle}>{formatPeloteScore(m)?.replace(" – ", "-") ?? "—"}</td>
                 <td style={tdStyle}>{matchStatusLabel(m.status)}</td>
-                {isAdmin ? (
+                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.levelGapEq1MinusEq2 ?? "—"}</td> : null}
+                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.scoreGap ?? "—"}</td> : null}
+                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.winEq1 ?? "—"}</td> : null}
+                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.loseEq1 ?? "—"}</td> : null}
+                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.winEq2 ?? "—"}</td> : null}
+                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.loseEq2 ?? "—"}</td> : null}
+                {canManageLeague ? (
                   <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                      <button
-                        type="button"
-                        style={buttonSecondary}
+                      <IconActionButton
+                        label={`Modifier la partie du ${m.date} dans un nouvel onglet`}
+                        icon={Pencil}
+                        iconSize={18}
+                        style={{ ...iconButtonBaseStyle, ...buttonSecondary }}
                         onClick={() => openAppPathInNewWindow(`/parties/${encodeURIComponent(m.id)}/modifier`)}
-                        aria-label={`Modifier la partie du ${m.date} dans un nouvel onglet`}
-                      >
-                        Modifier
-                      </button>
+                      />
                       <button
                         type="button"
-                        style={buttonDanger}
+                        style={{ ...iconButtonBaseStyle, ...buttonDanger }}
                         disabled={deletingId !== null}
                         onClick={() => void deleteMatch(m)}
                         aria-label={`Supprimer la partie du ${m.date}`}
+                        title="Supprimer la partie"
                       >
-                        {deletingId === m.id ? "…" : "Supprimer"}
+                        {deletingId === m.id ? (
+                          <Loader2 size={18} strokeWidth={2} className="animate-icon-spin" aria-hidden focusable={false} />
+                        ) : (
+                          <Trash2 size={18} strokeWidth={2} aria-hidden focusable={false} />
+                        )}
                       </button>
                     </div>
                   </td>
@@ -164,7 +270,7 @@ export function MatchesPage() {
 
 const tableStyle: CSSProperties = {
   width: "100%",
-  minWidth: "36rem",
+  minWidth: "28rem",
   borderCollapse: "collapse",
   background: "var(--surface)",
   borderRadius: 12,
@@ -172,24 +278,21 @@ const tableStyle: CSSProperties = {
 };
 const thStyle: CSSProperties = { textAlign: "left", padding: "0.6rem", borderBottom: "1px solid var(--muted)" };
 const tdStyle: CSSProperties = { padding: "0.6rem", borderBottom: "1px solid #334155" };
-const buttonPrimary: CSSProperties = { padding: "0.45rem 0.9rem", borderRadius: 8, border: "none", background: "var(--accent)", color: "#0f172a", fontWeight: 700, cursor: "pointer", minHeight: "2.75rem" };
+const buttonPrimary: CSSProperties = {
+  border: "none",
+  background: "var(--accent)",
+  color: "#0f172a",
+  fontWeight: 700,
+};
 const buttonSecondary: CSSProperties = {
-  padding: "0.45rem 0.9rem",
-  borderRadius: 8,
   border: "1px solid var(--muted)",
   background: "transparent",
   color: "var(--text)",
   fontWeight: 600,
-  cursor: "pointer",
-  minHeight: "2.75rem",
 };
 const buttonDanger: CSSProperties = {
-  padding: "0.45rem 0.9rem",
-  borderRadius: 8,
   border: "1px solid #f87171",
-  background: "transparent",
-  color: "#fca5a5",
+  background: "color-mix(in srgb, #f87171 12%, transparent)",
+  color: "#fecaca",
   fontWeight: 600,
-  cursor: "pointer",
-  minHeight: "2.75rem",
 };

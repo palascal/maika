@@ -1,5 +1,8 @@
+import { Loader2, Plus, Save } from "lucide-react";
 import type { CSSProperties, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { iconButtonBaseStyle } from "../components/IconActionButton";
+import { InfoTooltip } from "../components/InfoTooltip";
 import { maikaFromSeasonPoints } from "../domain/maika";
 import { playerIsActive } from "../domain/playerActive";
 import { collectPlayerIds, uniquePlayerId } from "../domain/playerId";
@@ -42,13 +45,21 @@ export function AdminPlayersPage() {
 
   return (
     <main>
-      <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>Gestion des joueurs</h2>
-      <p style={{ color: "var(--muted)", fontSize: "0.95rem", marginBottom: "1rem" }}>
-        En développement (<code>npm run dev</code>), les changements sont écrits dans{" "}
-        <code>public/data/players.json</code>. Après <code>npm run build</code>, utilisez{" "}
-        <code>npm run preview</code> pour enregistrer dans <code>dist/data/players.json</code>. Sur un hébergement
-        statique sans serveur, l’API d’enregistrement n’existe pas.
-      </p>
+      <div style={headingRowStyle}>
+        <h2 style={{ fontSize: "1.1rem", marginTop: 0, marginBottom: 0 }}>Gestion des joueurs</h2>
+        <InfoTooltip label="Aide gestion des joueurs">
+          <p style={tipTextStyle}>
+            En développement (<code>npm run dev</code>), les changements sont écrits dans <code>public/data/players.json</code>.
+          </p>
+          <p style={tipTextStyle}>
+            Après <code>npm run build</code>, utilisez <code>npm run preview</code> pour enregistrer dans{" "}
+            <code>dist/data/players.json</code>.
+          </p>
+          <p style={{ ...tipTextStyle, marginBottom: 0 }}>
+            Sur un hébergement statique sans serveur, l’API d’enregistrement n’existe pas.
+          </p>
+        </InfoTooltip>
+      </div>
       {message ? (
         <p style={{ color: "var(--accent)", marginBottom: "1rem", fontSize: "0.95rem" }}>{message}</p>
       ) : null}
@@ -179,8 +190,18 @@ function PlayerEditCard({
         <input type="checkbox" checked={active} disabled={disabled} onChange={(e) => setActive(e.target.checked)} />
         <span>Joueur actif (classé et sélectionnable pour les nouvelles parties)</span>
       </label>
-      <button type="submit" disabled={disabled} style={{ ...buttonSecondary, gridColumn: "1 / -1" }}>
-        Enregistrer ce joueur
+      <button
+        type="submit"
+        disabled={disabled}
+        aria-label="Enregistrer ce joueur"
+        title="Enregistrer"
+        style={{ ...iconButtonBaseStyle, ...buttonSecondary, gridColumn: "1 / -1", padding: "0.55rem 0.85rem" }}
+      >
+        {disabled ? (
+          <Loader2 size={19} strokeWidth={2} className="animate-icon-spin" aria-hidden focusable={false} />
+        ) : (
+          <Save size={19} strokeWidth={2} aria-hidden focusable={false} />
+        )}
       </button>
     </form>
   );
@@ -277,8 +298,18 @@ function AddPlayerSection({
           Maika
           <span style={readOnlyBoxStyle}>{maikaAddPreview}</span>
         </label>
-        <button type="submit" disabled={saving} style={{ ...buttonPrimary, gridColumn: "1 / -1" }}>
-          Ajouter
+        <button
+          type="submit"
+          disabled={saving}
+          aria-label="Ajouter le joueur"
+          title="Ajouter"
+          style={{ ...iconButtonBaseStyle, ...buttonPrimary, gridColumn: "1 / -1", border: "none", padding: "0.55rem 0.85rem" }}
+        >
+          {saving ? (
+            <Loader2 size={20} strokeWidth={2} className="animate-icon-spin" aria-hidden focusable={false} />
+          ) : (
+            <Plus size={20} strokeWidth={2} aria-hidden focusable={false} />
+          )}
         </button>
       </form>
     </section>
@@ -292,6 +323,14 @@ const labelStyle: CSSProperties = {
   fontSize: "0.85rem",
   color: "var(--muted)",
 };
+const headingRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  marginBottom: "1rem",
+};
+const tipTextStyle: CSSProperties = { margin: "0 0 0.45rem", color: "var(--text)" };
 
 const readOnlyBoxStyle: CSSProperties = {
   padding: "0.5rem 0.65rem",

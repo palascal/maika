@@ -13,3 +13,9 @@ export function appAbsolutePath(path: string): string {
   const p = path.startsWith("/") ? path : `/${path}`;
   return base ? `${base}${p}` : p;
 }
+
+/** Fichier servi depuis `public/` (ex. `logo.png` → `/maika/logo.png` avec base GitHub Pages). */
+export function publicAssetUrl(file: string): string {
+  const name = file.replace(/^\//, "");
+  return `${import.meta.env.BASE_URL}${name}`;
+}

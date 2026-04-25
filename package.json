@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/sync-logo.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:admin-sync-player-emails": "supabase functions deploy admin-sync-player-emails"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.0",
+    "lucide-react": "^1.9.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.0"

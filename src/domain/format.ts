@@ -27,6 +27,24 @@ export function formatDateLongFr(isoDay: string): string {
   return `${day} ${MOIS_FR_LONG[monthIndex]} ${year}`;
 }
 
+/** Ex. 2026-04-25 → « vendredi 25 avril » (sans année). */
+export function formatDateDayMonthFr(isoDay: string): string {
+  const m = isoDay.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return isoDay;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return isoDay;
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(dt.getTime())) return isoDay;
+  return new Intl.DateTimeFormat("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  }).format(dt);
+}
+
 /** Affichage heure partie seule (pas de minutes) : 17h. Accepte « 17 », « 17:00 », etc. */
 export function formatMatchHourDisplay(raw: string | undefined): string {
   if (raw == null || raw.trim() === "") return "";
@@ -51,6 +69,13 @@ export const MATCH_HOUR_VALUES: readonly string[] = (() => {
   return out;
 })();
 
+/** Heures proposées pour une nouvelle partie (9h–22h). */
+export const MATCH_HOUR_DAY_RANGE: readonly string[] = (() => {
+  const out: string[] = [];
+  for (let h = 9; h <= 22; h++) out.push(String(h).padStart(2, "0"));
+  return out;
+})();
+
 export function playerFullName(p: Player): string {
   return `${p.firstName} ${p.lastName}`.trim();
 }
@@ -65,7 +90,7 @@ export function formatTeamLabel(team: DoublesTeam, map: Map<PlayerId, Player>): 
   const pb = map.get(b);
   const na = pa ? playerFullName(pa) : a;
   const nb = pb ? playerFullName(pb) : b;
-  return `${na} / ${nb}`;
+  return `${na}\u00a0·\u00a0${nb}`;
 }
 
 export function formatMatchLine(m: Match, map: Map<PlayerId, Player>): string {

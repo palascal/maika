@@ -1,11 +1,17 @@
+import { Loader2, Pencil, Plus, Save, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { IconActionButton, iconButtonBaseStyle } from "../components/IconActionButton";
+import { AppLink } from "../navigation/AppLink";
 import { useAuth } from "../auth/AuthContext";
 import { maikaFromSeasonPoints } from "../domain/maika";
 import { playerIsActive } from "../domain/playerActive";
 import { collectPlayerIds, uniquePlayerId } from "../domain/playerId";
 import { posteLabel } from "../domain/ranking";
-import type { Player, PlayerPoste, PlayersFile } from "../domain/types";
+import type { Player, PlayerAccessRole, PlayerPoste, PlayersFile } from "../domain/types";
+import { computePlayerAuthChanges, syncPlayerAuthEmailsAfterSave } from "../data/playerEmailAuthSync";
+import { appRoleLabel } from "../lib/accessRoles";
+import { isSupabaseConfigured } from "../lib/supabaseConfig";
 import { useSeasonData } from "../season/SeasonDataContext";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -21,8 +27,15 @@ function isValidOptionalEmail(raw: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
 }
 
+function emailPreview(raw?: string): string {
+  if (!raw) return "—";
+  const t = raw.trim();
+  if (t.length <= 10) return t;
+  return `${t.slice(0, 10)}…`;
+}
+
 export function AdminPlayersManagementPage() {
-  const { isAdmin } = useAuth();
+  const { canManageLeague, canAssignElevatedRoles } = useAuth();
   const { data, error, loading, savePlayersFile } = useSeasonData();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
@@ -63,6 +76,8 @@ export function AdminPlayersManagementPage() {
   const persist = useCallback(
     async (nextPlayers: Player[]) => {
       if (!data) return;
+      const beforePlayers = data.players.players;
+      const authChanges = computePlayerAuthChanges(beforePlayers, nextPlayers);
       const next: PlayersFile = {
         ...data.players,
         players: nextPlayers,
@@ -72,6 +87,14 @@ export function AdminPlayersManagementPage() {
       setSaving(true);
       try {
         await savePlayersFile(next);
+        if (isSupabaseConfigured() && authChanges.length > 0) {
+          const sync = await syncPlayerAuthEmailsAfterSave(authChanges);
+          if (!sync.ok) {
+            setSaveError(
+              `Joueurs enregistrés, mais la synchronisation Supabase Auth a échoué : ${sync.message} Déployez la fonction Edge « admin-sync-player-emails » (voir docs/INSTRUCTIONS.md).`,
+            );
+          }
+        }
         setModal(null);
       } catch (e: unknown) {
         setSaveError(e instanceof Error ? e.message : "Enregistrement impossible.");
@@ -104,7 +127,7 @@ export function AdminPlayersManagementPage() {
     [filtered],
   );
 
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!canManageLeague) return <Navigate to="/" replace />;
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data) return <p>Chargement…</p>;
 
@@ -115,12 +138,14 @@ export function AdminPlayersManagementPage() {
           <h2 style={{ fontSize: "1.2rem", margin: "0 0 0.35rem" }}>Administration des joueurs</h2>
           <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.92rem", maxWidth: 640 }}>
             Création, édition, e-mail de contact et activation. Les parties existantes ne sont pas modifiées lorsqu’un joueur
-            est désactivé. Le bouton « Ajouter » de la page Joueurs ouvre cette même vue.
+            est désactivé. Le bouton « Ajouter » de la page Joueurs ouvre cette même vue. En mode Supabase, un e-mail
+            renseigné est aligné sur Authentication (invitation ou changement d’adresse) après enregistrement, si la fonction
+            Edge est déployée.
           </p>
         </div>
-        <Link to="/joueurs" style={ghostLinkStyle}>
+        <AppLink to="/joueurs" style={ghostLinkStyle}>
           ← Liste & classements
-        </Link>
+        </AppLink>
       </div>
 
       <div style={toolbarStyle}>
@@ -137,9 +162,13 @@ export function AdminPlayersManagementPage() {
           <option value="actifs">Actifs seulement</option>
           <option value="inactifs">Désactivés seulement</option>
         </select>
-        <button type="button" style={accentBtnStyle} onClick={() => setModal({ mode: "create" })}>
-          + Nouveau joueur
-        </button>
+        <IconActionButton
+          label="Créer un nouveau joueur"
+          icon={Plus}
+          iconSize={20}
+          style={{ ...iconButtonBaseStyle, ...accentBtnStyle, border: "none", padding: "0.5rem 0.75rem" }}
+          onClick={() => setModal({ mode: "create" })}
+        />
       </div>
 
       {saveError ? (
@@ -157,27 +186,31 @@ export function AdminPlayersManagementPage() {
               <th style={thStyle}>Points</th>
               <th style={thStyle}>Maika</th>
               <th style={thStyle}>E-mail</th>
-              <th style={thStyle}>État</th>
-              <th style={thStyle} />
+              <th style={thStyle}>Rôle</th>
+              <th style={{ ...thStyle, whiteSpace: "nowrap", minWidth: 118 }}>État</th>
             </tr>
           </thead>
           <tbody>
             {sorted.map((p) => (
               <tr key={p.id} style={{ opacity: playerIsActive(p) ? 1 : 0.72 }}>
                 <td style={tdStyle}>
-                  <div style={{ fontWeight: 600 }}>{p.firstName} {p.lastName}</div>
-                  <code style={{ fontSize: "0.78rem", color: "var(--muted)" }}>{p.id}</code>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <IconActionButton
+                      label={`Modifier ${p.firstName} ${p.lastName}`}
+                      icon={Pencil}
+                      iconSize={17}
+                      style={{ ...iconButtonBaseStyle, ...smallBtnStyle, padding: "0.35rem 0.5rem", flexShrink: 0 }}
+                      onClick={() => setModal({ mode: "edit", player: p })}
+                    />
+                    <div style={{ fontWeight: 600, minWidth: 0 }}>{p.firstName} {p.lastName}</div>
+                  </div>
                 </td>
                 <td style={tdStyle}>{posteLabel(p.poste)}</td>
                 <td style={tdStyle}>{p.seasonPoints}</td>
                 <td style={tdStyle}>{maikaFromSeasonPoints(p.seasonPoints)}</td>
-                <td style={tdStyle}>{p.email ?? "—"}</td>
-                <td style={tdStyle}>{playerIsActive(p) ? <span style={badgeOk}>Actif</span> : <span style={badgeOff}>Désactivé</span>}</td>
-                <td style={tdStyle}>
-                  <button type="button" style={smallBtnStyle} onClick={() => setModal({ mode: "edit", player: p })}>
-                    Modifier
-                  </button>
-                </td>
+                <td style={tdStyle} title={p.email ?? undefined}>{emailPreview(p.email)}</td>
+                <td style={tdStyle}>{appRoleLabel(p.authRole ?? "user")}</td>
+                <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{playerIsActive(p) ? <span style={badgeOk}>Actif</span> : <span style={badgeOff}>Désactivé</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -191,6 +224,7 @@ export function AdminPlayersManagementPage() {
           players={data.players.players}
           startingSeasonPoints={data.scoring.startingSeasonPoints}
           saving={saving}
+          canAssignElevatedRoles={canAssignElevatedRoles}
           onClose={() => {
             setSaveError(null);
             setModal(null);
@@ -210,6 +244,7 @@ function PlayerModal({
   players,
   startingSeasonPoints,
   saving,
+  canAssignElevatedRoles,
   onClose,
   onSave,
 }: {
@@ -218,6 +253,7 @@ function PlayerModal({
   players: Player[];
   startingSeasonPoints: number;
   saving: boolean;
+  canAssignElevatedRoles: boolean;
   onClose: () => void;
   onSave: (list: Player[]) => void | Promise<void>;
 }) {
@@ -226,6 +262,7 @@ function PlayerModal({
   const [poste, setPoste] = useState<PlayerPoste>(player?.poste ?? "avant");
   const [seasonPoints, setSeasonPoints] = useState(String(player?.seasonPoints ?? startingSeasonPoints));
   const [email, setEmail] = useState(player?.email ?? "");
+  const [authRole, setAuthRole] = useState<PlayerAccessRole>(player?.authRole ?? "user");
   const [active, setActive] = useState(player ? playerIsActive(player) : true);
   const [localErr, setLocalErr] = useState<string | null>(null);
 
@@ -235,6 +272,7 @@ function PlayerModal({
     setPoste(player?.poste ?? "avant");
     setSeasonPoints(String(player?.seasonPoints ?? startingSeasonPoints));
     setEmail(player?.email ?? "");
+    setAuthRole(player?.authRole ?? "user");
     setActive(player ? playerIsActive(player) : true);
     setLocalErr(null);
   }, [player, mode, startingSeasonPoints]);
@@ -257,6 +295,10 @@ function PlayerModal({
         const updated: Player = { ...p, lastName: ln, firstName: fn, poste, seasonPoints: Math.round(pts), active };
         if (em) updated.email = em;
         else delete (updated as { email?: string }).email;
+        if (canAssignElevatedRoles) {
+          if (authRole === "user") delete (updated as { authRole?: PlayerAccessRole }).authRole;
+          else updated.authRole = authRole;
+        }
         return updated;
       });
       await onSave(next);
@@ -271,6 +313,7 @@ function PlayerModal({
       seasonPoints: Math.round(pts),
       active,
       ...(em ? { email: em } : {}),
+      ...(canAssignElevatedRoles && authRole !== "user" ? { authRole } : {}),
     };
     await onSave([...players, newP]);
   }
@@ -288,9 +331,7 @@ function PlayerModal({
           <h3 id="player-modal-title" style={{ margin: 0, fontSize: "1.05rem" }}>
             {mode === "create" ? "Nouveau joueur" : "Modifier le joueur"}
           </h3>
-          <button type="button" aria-label="Fermer" onClick={onClose} style={closeBtnStyle}>
-            ×
-          </button>
+          <IconActionButton label="Fermer" icon={X} iconSize={22} style={{ ...iconButtonBaseStyle, ...closeBtnStyle }} onClick={onClose} />
         </div>
         <form onSubmit={(e) => void submit(e)} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="responsive-form-grid" style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
@@ -324,7 +365,25 @@ function PlayerModal({
                 autoComplete="off"
                 style={inputStyle}
               />
+              <span style={{ fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.35 }}>
+                Avec Supabase : création ou modification déclenche une synchro vers les comptes Auth (invitation ou mise à
+                jour de l’e-mail). Retirer l’e-mail ici ne supprime pas le compte Auth.
+              </span>
             </label>
+            {canAssignElevatedRoles ? (
+              <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>
+                Rôle applicatif (compte lié à l’e-mail)
+                <select value={authRole} disabled={saving} onChange={(e) => setAuthRole(e.target.value as PlayerAccessRole)} style={inputStyle}>
+                  <option value="user">User (lecture)</option>
+                  <option value="orga">Orga (gestion joueurs + parties)</option>
+                  <option value="admin">Admin (config + attribution des rôles)</option>
+                </select>
+              </label>
+            ) : (
+              <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted)", gridColumn: "1 / -1" }}>
+                Seul un admin peut attribuer les rôles <code>orga</code> ou <code>admin</code>.
+              </p>
+            )}
             <label style={{ ...labelStyle, gridColumn: "1 / -1", flexDirection: "row", alignItems: "center", gap: 10 }}>
               <input type="checkbox" checked={active} disabled={saving} onChange={(e) => setActive(e.target.checked)} />
               <span>Joueur actif (classé et sélectionnable pour les nouvelles parties)</span>
@@ -341,11 +400,26 @@ function PlayerModal({
             </p>
           ) : null}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 4 }}>
-            <button type="button" style={secondaryBtnStyle} onClick={onClose} disabled={saving}>
-              Annuler
-            </button>
-            <button type="submit" style={accentBtnStyle} disabled={saving}>
-              {saving ? "Enregistrement…" : "Enregistrer"}
+            <IconActionButton
+              label="Annuler"
+              icon={X}
+              iconSize={20}
+              disabled={saving}
+              style={{ ...iconButtonBaseStyle, ...secondaryBtnStyle, padding: "0.5rem 0.75rem" }}
+              onClick={onClose}
+            />
+            <button
+              type="submit"
+              disabled={saving}
+              aria-label={saving ? "Enregistrement en cours" : "Enregistrer le joueur"}
+              title={saving ? "Enregistrement…" : "Enregistrer"}
+              style={{ ...iconButtonBaseStyle, ...accentBtnStyle, border: "none", padding: "0.5rem 0.85rem" }}
+            >
+              {saving ? (
+                <Loader2 size={20} strokeWidth={2} className="animate-icon-spin" aria-hidden focusable={false} />
+              ) : (
+                <Save size={20} strokeWidth={2} aria-hidden focusable={false} />
+              )}
             </button>
           </div>
         </form>
@@ -433,16 +507,15 @@ const badgeOff: CSSProperties = {
 const smallBtnStyle: CSSProperties = {
   padding: "0.35rem 0.65rem",
   borderRadius: 8,
-  border: "1px solid var(--muted)",
-  background: "transparent",
-  color: "var(--text)",
+  border: "1px solid color-mix(in srgb, var(--accent) 45%, var(--muted))",
+  background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+  color: "var(--accent)",
   fontWeight: 600,
   cursor: "pointer",
   fontSize: "0.88rem",
 };
 
 const accentBtnStyle: CSSProperties = {
-  padding: "0.55rem 1rem",
   borderRadius: 10,
   border: "none",
   background: "var(--accent)",
@@ -479,10 +552,10 @@ const closeBtnStyle: CSSProperties = {
   border: "none",
   background: "transparent",
   color: "var(--muted)",
-  fontSize: "1.5rem",
-  lineHeight: 1,
   cursor: "pointer",
-  padding: "0 0.25rem",
+  padding: "0.15rem",
+  minWidth: "2.25rem",
+  minHeight: "2.25rem",
 };
 
 const labelStyle: CSSProperties = {
@@ -505,7 +578,6 @@ const inputStyle: CSSProperties = {
 };
 
 const secondaryBtnStyle: CSSProperties = {
-  padding: "0.55rem 1rem",
   borderRadius: 10,
   border: "1px solid var(--muted)",
   background: "transparent",

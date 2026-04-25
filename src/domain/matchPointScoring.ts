@@ -20,15 +20,15 @@ export interface MatchPointScoringRules {
   /** Défaite : favori perd fortement (écart total Maika ≤ −2) */
   defeatWinnerMinusLoserLteMinus2: number;
   /**
-   * Bonus offensif : écart de score |vainqueur − perdant| **strictement supérieur** à cette valeur
-   * (ex. 11 → écart ≥ 12) : chaque joueur de l’équipe gagnante reçoit `offensiveBonusPoints`.
+   * Bonus offensif : score perdant max (activation si score perdant strictement inférieur à cette valeur).
+   * Ex. 29 -> si le perdant fait 28 ou moins, chaque vainqueur reçoit `offensiveBonusPoints`.
    */
   offensiveBonusMarginGt: number;
   /** Points bonus offensifs par joueur vainqueur (souvent 1). */
   offensiveBonusPoints: number;
   /**
-   * Bonus défensif : si l’écart de score est **strictement inférieur** à cette valeur
-   * (ex. 15 → écart ≤ 14), chaque joueur de l’équipe perdante reçoit `defensiveBonusPoints`.
+   * Bonus défensif : score d’activation du bonus (score du perdant >= cette valeur).
+   * Ex. 36 -> si le perdant fait 36 ou plus, chaque perdant reçoit `defensiveBonusPoints`.
    */
   defensiveBonusMarginLt: number;
   /** Points bonus défensifs par joueur perdant (souvent 1). */
@@ -44,9 +44,9 @@ export const DEFAULT_MATCH_POINT_SCORING_RULES: MatchPointScoringRules = {
   defeatWinnerMinusLoserEq0: -2,
   defeatWinnerMinusLoserEqMinus1: -3,
   defeatWinnerMinusLoserLteMinus2: -4,
-  offensiveBonusMarginGt: 11,
+  offensiveBonusMarginGt: 29,
   offensiveBonusPoints: 1,
-  defensiveBonusMarginLt: 15,
+  defensiveBonusMarginLt: 36,
   defensiveBonusPoints: 1,
 };
 
@@ -74,11 +74,11 @@ export const MATCH_POINT_SCORING_RULE_LABELS: Record<keyof MatchPointScoringRule
   victoryOpponentMinusWinnerLt0: "Victoire — adversaire moins fort (écart négatif)",
   defeatWinnerMinusLoserGt0: "Défaite — contre équipe plus forte",
   defeatWinnerMinusLoserEq0: "Défaite — égalité de niveau",
-  defeatWinnerMinusLoserEqMinus1: "Défaite — contre équipe moins forte (écart ≤ 1)",
-  defeatWinnerMinusLoserLteMinus2: "Défaite — contre équipe encore moins forte (écart ≥ 2)",
-  offensiveBonusMarginGt: "Bonus offensif — seuil écart score (victoire si écart > N)",
+  defeatWinnerMinusLoserEqMinus1: "Défaite — def_ecart_1 (écart niveau >= -2)",
+  defeatWinnerMinusLoserLteMinus2: "Défaite — def_ecart_2 (écart niveau < -2)",
+  offensiveBonusMarginGt: "Bonus offensif — score perdant max (bonus si score perdant < N)",
   offensiveBonusPoints: "Bonus offensif — points par joueur vainqueur",
-  defensiveBonusMarginLt: "Bonus défensif — seuil écart score (défaite si écart < N)",
+  defensiveBonusMarginLt: "Bonus défensif — score d’activation (score perdant >= N)",
   defensiveBonusPoints: "Bonus défensif — points par joueur perdant",
 };
 
@@ -113,8 +113,8 @@ function victoryPoints(opponentMinusWinner: number, rules: MatchPointScoringRule
 
 function defeatPoints(winnerMinusLoser: number, rules: MatchPointScoringRules): number {
   if (winnerMinusLoser > 0) return rules.defeatWinnerMinusLoserGt0;
-  if (winnerMinusLoser === 0) return rules.defeatWinnerMinusLoserEq0;
-  if (winnerMinusLoser === -1) return rules.defeatWinnerMinusLoserEqMinus1;
+  if (winnerMinusLoser > -1) return rules.defeatWinnerMinusLoserEq0;
+  if (winnerMinusLoser >= -2) return rules.defeatWinnerMinusLoserEqMinus1;
   return rules.defeatWinnerMinusLoserLteMinus2;
 }
 
@@ -136,6 +136,9 @@ export function matchPointDeltasForPlayedMatch(
   const sb = match.scoreTeamB;
   if (sa == null || sb == null || !Number.isFinite(sa) || !Number.isFinite(sb)) return out;
   if (sa === sb) return out;
+  const scoreMax = Math.max(sa, sb);
+  // Formules métier fournies : attribution de victoire/défaite seulement sur une partie gagnée à 40.
+  if (scoreMax !== 40) return out;
 
   const maikaA = teamMaikaSum(match.teamA, seasonPointsBefore);
   const maikaB = teamMaikaSum(match.teamB, seasonPointsBefore);
@@ -160,14 +163,14 @@ export function matchPointDeltasForPlayedMatch(
     out.set(id, (out.get(id) ?? 0) + losePts);
   }
 
-  const scoreMargin = Math.abs(sa - sb);
-  if (scoreMargin > rules.offensiveBonusMarginGt && rules.offensiveBonusPoints !== 0) {
+  const loserScore = aWins ? sb : sa;
+  if (loserScore < rules.offensiveBonusMarginGt && rules.offensiveBonusPoints !== 0) {
     const b = rules.offensiveBonusPoints;
     for (const id of winnerTeam) {
       out.set(id, (out.get(id) ?? 0) + b);
     }
   }
-  if (scoreMargin < rules.defensiveBonusMarginLt && rules.defensiveBonusPoints !== 0) {
+  if (loserScore >= rules.defensiveBonusMarginLt && rules.defensiveBonusPoints !== 0) {
     const b = rules.defensiveBonusPoints;
     for (const id of loserTeam) {
       out.set(id, (out.get(id) ?? 0) + b);

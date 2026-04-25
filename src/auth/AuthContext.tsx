@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getSupabaseClient } from "../lib/supabaseClient";
+import { canAccessConfig, canAssignElevatedRoles, canManageLeague } from "../lib/accessRoles";
 import { isSupabaseConfigured } from "../lib/supabaseConfig";
 import type { AuthSession } from "./authCredentials";
 import { authSessionFromSupabaseUser } from "./mapSupabaseSession";
@@ -11,7 +12,11 @@ interface AuthContextValue {
   authReady: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  role: AuthSession["role"] | null;
   isAdmin: boolean;
+  canManageLeague: boolean;
+  canAccessConfig: boolean;
+  canAssignElevatedRoles: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -69,7 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authReady,
       login,
       logout,
+      role: session?.role ?? null,
       isAdmin: session?.role === "admin",
+      canManageLeague: session ? canManageLeague(session.role) : false,
+      canAccessConfig: session ? canAccessConfig(session.role) : false,
+      canAssignElevatedRoles: session ? canAssignElevatedRoles(session.role) : false,
     }),
     [session, authReady, login, logout],
   );

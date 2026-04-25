@@ -6,7 +6,7 @@ Document destiné à un humain ou à une IA pour reprendre le projet sans parcou
 
 ## 1. Objectif produit
 
-Application web **React + TypeScript + Vite** pour gérer une **saison** de **double** (4 joueurs par partie), afficher une **synthèse / classement** par **poste** (avant / arrière), enregistrer des **parties** (prévues, jouées, annulées) et appliquer un **barème de points saison** configurable, avec notion de **Maika** (niveau affiché dérivé des points).
+Application web **React + TypeScript + Vite** pour gérer une **saison** de **double** (4 joueurs par partie), afficher un **Dashboard / classement** par **poste** (avant / arrière), enregistrer des **parties** (prévues, jouées, annulées) et appliquer un **barème de points saison** configurable, avec notion de **Maika** (niveau affiché dérivé des points).
 
 ---
 
@@ -116,12 +116,12 @@ Chaque joueur de l’**équipe gagnante** reçoit cette valeur (une fois par jou
 
 Chaque joueur de l’**équipe perdante** reçoit cette valeur.
 
-### 5.5 Bonus liés à l’écart **au score** (40)
+### 5.5 Bonus liés au score de l’équipe perdante (40)
 
-Soit `scoreMargin = abs(scoreTeamA - scoreTeamB)`.
+Soit `loserScore = min(scoreTeamA, scoreTeamB)` (sur une partie validée à 40).
 
-- **Bonus offensif** (vainqueurs) : si `scoreMargin > offensiveBonusMarginGt` **strictement**, chaque joueur vainqueur reçoit `offensiveBonusPoints`. Défaut : marge > 11 → +1 chacun.
-- **Bonus défensif** (perdants) : si `scoreMargin < defensiveBonusMarginLt` **strictement**, chaque joueur perdant reçoit `defensiveBonusPoints`. Défaut : marge < 15 → +1 chacun.
+- **Bonus offensif** (vainqueurs) : si `loserScore < offensiveBonusMarginGt`, chaque joueur vainqueur reçoit `offensiveBonusPoints`. Défaut : score perdant < 29 → +1 chacun.
+- **Bonus défensif** (perdants) : si `loserScore >= defensiveBonusMarginLt`, chaque joueur perdant reçoit `defensiveBonusPoints`. Défaut : score perdant >= 36 → +1 chacun.
 
 Les clés et libellés UI sont listées dans `MATCH_POINT_SCORING_RULE_KEYS` et `MATCH_POINT_SCORING_RULE_LABELS`.
 
@@ -188,7 +188,7 @@ Définies dans `src/App.tsx` (toutes derrière `RequireAuth` sauf `/connexion`) 
 
 | Chemin | Page |
 |--------|------|
-| `/` | Synthèse (`HomePage`) |
+| `/` | Dashboard (`HomePage`) |
 | `/parties` | Liste des parties + actions |
 | `/parties/ajout`, `/parties/:matchId/modifier` | Formulaire partie (`MatchFormPage`) — souvent ouvert dans un nouvel onglet depuis la liste |
 | `/joueurs` | Liste joueurs |

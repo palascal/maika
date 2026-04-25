@@ -1,7 +1,10 @@
-/** URL de base de l’app (origine + chemin Vite), pour OAuth Supabase (redirectTo). */
-export function supabaseOAuthRedirectTo(): string {
-  const base = import.meta.env.BASE_URL;
-  if (!base || base === "/") return `${window.location.origin}/`;
-  const path = base.endsWith("/") ? base : `${base}/`;
-  return `${window.location.origin}${path}`;
+import { appAbsolutePath } from "./routerBasename";
+
+/**
+ * URL complète de retour après « mot de passe oublié » (e-mail Supabase).
+ * À autoriser dans Supabase : Authentication → URL configuration → Redirect URLs.
+ */
+export function supabasePasswordRecoveryRedirectTo(): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}${appAbsolutePath("/profil")}`;
 }

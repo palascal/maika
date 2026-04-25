@@ -8,8 +8,11 @@ import { appAbsolutePath } from "../lib/routerBasename";
 export function openAppPathInNewWindow(path: string): void {
   const fullPath = appAbsolutePath(path);
   const url = `${window.location.origin}${fullPath}`;
-  const handle = window.open(url, "_blank", "noopener,noreferrer");
-  if (!handle) {
+  const handle = window.open(url, "_blank");
+  if (handle) {
+    // Harden against reverse-tabnabbing without relying on browser-specific "noreferrer" behavior.
+    handle.opener = null;
+  } else {
     window.location.assign(fullPath);
   }
 }

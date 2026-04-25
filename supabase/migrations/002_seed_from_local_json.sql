@@ -126,9 +126,9 @@ values (
     "defeatWinnerMinusLoserEq0": -2,
     "defeatWinnerMinusLoserEqMinus1": -3,
     "defeatWinnerMinusLoserLteMinus2": -4,
-    "offensiveBonusMarginGt": 11,
+    "offensiveBonusMarginGt": 29,
     "offensiveBonusPoints": 1,
-    "defensiveBonusMarginLt": 15,
+    "defensiveBonusMarginLt": 36,
     "defensiveBonusPoints": 1
   }$$::jsonb
 )

@@ -2,7 +2,7 @@
 
 Ce fichier regroupe **les étapes concrètes** pour utiliser l’application avec une base **Supabase** (édition en ligne depuis le site, y compris hébergement statique type GitHub Pages).
 
-Si vous ne configurez **pas** Supabase, vous n’avez pas à suivre ce guide : gardez les fichiers JSON dans `public/data/`, lancez `npm run dev` pour sauvegarder, et utilisez les comptes démo `admin` / `admin` ou `user` / `user` sur l’écran de connexion.
+Si vous ne configurez **pas** Supabase, vous n’avez pas à suivre ce guide : gardez les fichiers JSON dans `public/data/`, lancez `npm run dev` pour sauvegarder, et utilisez les comptes démo `admin` / `admin`, `orga` / `orga` ou `user` / `user` sur l’écran de connexion.
 
 ---
 
@@ -11,6 +11,7 @@ Si vous ne configurez **pas** Supabase, vous n’avez pas à suivre ce guide : g
 1. [ ] Créer un projet Supabase et récupérer l’URL + la clé **anon**.
 2. [ ] Exécuter le script SQL du dépôt dans Supabase.
 3. [ ] Activer la connexion par e-mail et créer un utilisateur **admin** (`app_metadata.role`).
+3bis. [ ] (Recommandé) Déployer la fonction Edge **`admin-sync-player-emails`** (`npm run deploy:admin-sync-player-emails` dans `classement-tennis`) pour aligner les e-mails joueurs sur **Authentication** (voir §3 ci-dessous).
 4. [ ] Créer `.env.local` avec `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`.
 5. [ ] `npm run dev` → se connecter avec l’e-mail Supabase (pas `admin`/`admin`).
 6. [ ] (Optionnel) Importer joueurs / parties / config ; ou saisir depuis l’app.
@@ -47,7 +48,7 @@ Si vous voulez un autre identifiant de saison, ajoutez une ligne dans `seasons` 
 
 ---
 
-## 3. Comptes et droits administrateur
+## 3. Comptes et rôles (user / orga / admin)
 
 1. **Authentication** → **Providers** : assurez-vous que **Email** est activé.  
    Pour des tests rapides, vous pouvez désactiver la confirmation d’e-mail dans les paramètres du provider ; en production, gardez une confirmation raisonnable.
@@ -60,9 +61,37 @@ Si vous voulez un autre identifiant de saison, ajoutez une ligne dans `seasons` 
 
 4. Enregistrez.
 
-Sans ce `role: "admin"`, l’utilisateur est traité comme **simple lecteur** dans l’interface (pas de lien Config, pas d’écriture autorisée par les politiques RLS).
+Rôles pris en charge :
 
-**Important** : la clé **anon** est incluse dans le site publié ; la protection des écritures repose sur **Supabase RLS** et sur le fait que seuls les comptes avec `app_metadata.role = admin` peuvent modifier les données.
+- `user` : lecture (classements / parties) ;
+- `orga` : gestion des joueurs et des parties (création / modification / suppression) ;
+- `admin` : tout `orga` + accès Config + attribution des rôles `orga`/`admin` aux autres utilisateurs.
+
+**Important** : la clé **anon** est incluse dans le site publié ; la protection des écritures repose sur **Supabase RLS** et sur `app_metadata.role`.
+
+### Synchronisation des e-mails joueurs vers Supabase Auth
+
+Dans **Administration des joueurs**, lorsqu’un admin enregistre un joueur avec un **e-mail**, l’application appelle une **Edge Function** (`admin-sync-player-emails`) qui :
+
+- crée un compte Auth **nouveau** (invitation par e-mail en priorité ; à défaut, utilisateur confirmé avec mot de passe aléatoire — l’utilisateur peut alors utiliser **Mot de passe oublié**) ;
+- met à jour l’**adresse e-mail** du compte Auth si l’ancienne adresse du joueur correspondait déjà à un utilisateur ;
+- ne **supprime pas** un compte Auth si vous videz le champ e-mail dans Maika.
+
+**Déploiement** (une fois par projet), depuis le dossier **`classement-tennis`** avec le [CLI Supabase](https://supabase.com/docs/guides/cli) lié au projet :
+
+Depuis le dossier **`classement-tennis`** (après `npm install`) :
+
+```bash
+npm run deploy:admin-sync-player-emails
+```
+
+Équivalent sans script npm : `npx supabase functions deploy admin-sync-player-emails` (le binaire n’a pas besoin d’être installé globalement ; sous Windows, `supabase` seul échoue souvent s’il n’est pas dans le `PATH`).
+
+Les variables `SUPABASE_URL`, `SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY` sont fournies automatiquement au runtime de la fonction.
+
+**Optionnel** : secret **`INVITE_REDIRECT_TO`** sur la fonction (ex. `https://votre-hôte/maika/`) pour le lien dans l’e-mail d’invitation.
+
+Sans cette fonction déployée, les joueurs s’enregistrent toujours en base, mais un **message d’erreur** après la sauvegarde indique que la synchro Auth a échoué.
 
 ### Connexion Google (optionnel)
 
@@ -73,6 +102,14 @@ Sans ce `role: "admin"`, l’utilisateur est traité comme **simple lecteur** da
 5. **Authentication** → **URL Configuration** :
    - **Site URL** : l’URL publique de l’app (ex. `https://palascal.github.io/maika/` sur GitHub Pages).
    - **Redirect URLs** : inclure au minimum l’URL du site et `http://localhost:5173/**` pour le dev local.
+   - **Mot de passe oublié** : ajoutez aussi l’URL exacte de la page profil après réinitialisation, par ex. `https://<hôte>/<base>/profil` (ex. `https://palascal.github.io/maika/profil`) et en local `http://localhost:5173/profil`. Sans cette entrée, Supabase peut refuser le `redirectTo` ou le lien dans le mail peut échouer.
+
+**Si un utilisateur ne reçoit pas le mail de réinitialisation** alors que l’app affiche le message de confirmation :
+
+1. **Authentication → Users** : vérifier qu’un utilisateur existe avec **exactement** la même adresse e-mail (faute de frappe, autre domaine, compte jamais créé que par Google sans mot de passe — l’e-mail doit quand même exister côté Auth).
+2. **Courrier indésirable** : les envois par défaut Supabase sont souvent filtrés (notamment Yahoo).
+3. **Authentication → Logs** : regarder les erreurs d’envoi ou de provider.
+4. **SMTP personnalisé** (Settings → Auth) : en production, configurer un expéditeur fiable (SendGrid, Resend, etc.) améliore fortement la délivrabilité.
 
 Les utilisateurs créés via Google n’ont pas `app_metadata.role` par défaut : attribuez **`{ "role": "admin" }`** manuellement aux comptes autorisés à gérer les données (comme à l’étape 3).
 
