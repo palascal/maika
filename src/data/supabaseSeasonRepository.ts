@@ -18,6 +18,10 @@ function asMatch(raw: unknown): Match {
   return raw as Match;
 }
 
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export async function loadSeasonFromSupabase(): Promise<SeasonBundle> {
   const sb = getSupabaseClient();
   const seasonId = supabaseSeasonId();
@@ -40,11 +44,12 @@ export async function loadSeasonFromSupabase(): Promise<SeasonBundle> {
     const email = typeof rawEmail === "string" && rawEmail.trim() ? rawEmail.trim().toLowerCase() : undefined;
     const rawRole = (r as { auth_role?: string | null }).auth_role;
     const authRole = typeof rawRole === "string" && rawRole.trim() ? normalizeAppRole(rawRole.trim().toLowerCase()) : "user";
+    const poste = (r as { poste?: string | null }).poste === "arriere" ? "arriere" : "avant";
     return {
       id: r.player_id as string,
-      lastName: r.last_name as string,
-      firstName: r.first_name as string,
-      poste: r.poste as Player["poste"],
+      lastName: normalizeText((r as { last_name?: string | null }).last_name),
+      firstName: normalizeText((r as { first_name?: string | null }).first_name),
+      poste,
       seasonPoints: Number(r.season_points) || 0,
       ...(email ? { email } : {}),
       ...(authRole !== "user" ? { authRole } : {}),

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "bump:build": "node scripts/bump-build.mjs",
     "prebuild": "node scripts/sync-logo.mjs",
     "build": "vite build",
     "preview": "vite preview",

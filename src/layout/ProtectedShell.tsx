@@ -1,6 +1,7 @@
 import { UserRound } from "lucide-react";
 import { Outlet } from "react-router-dom";
 import { SiteLogo } from "../components/SiteLogo";
+import { BUILD_NUMBER } from "../buildInfo";
 import { useAuth } from "../auth/AuthContext";
 import { ShellNavLink } from "../navigation/AppLink";
 import { SeasonDataProvider } from "../season/SeasonDataContext";
@@ -34,25 +35,17 @@ function Nav() {
       }}
     >
       <ShellNavLink to="/" end style={homeLinkStyle} title="Dashboard — accueil">
-        {({ isActive }) => (
-          <>
-            <SiteLogo size={22} style={{ opacity: isActive ? 1 : 0.88 }} decorative />
-            <span>Dashboard</span>
-          </>
-        )}
+        <span>Dashboard</span>
       </ShellNavLink>
       <ShellNavLink to="/parties" style={linkStyle}>
         Parties
-      </ShellNavLink>
-      <ShellNavLink to="/joueurs" style={linkStyle}>
-        Joueurs
       </ShellNavLink>
       <ShellNavLink to="/reglement" style={linkStyle}>
         Règlement
       </ShellNavLink>
       {canManageLeague ? (
         <ShellNavLink to="/admin/joueurs" style={linkStyle}>
-          Admin joueurs
+          Joueurs
         </ShellNavLink>
       ) : null}
       {canAccessConfig ? (
@@ -78,18 +71,28 @@ export function ProtectedShell() {
                 style={{
                   fontSize: "1.35rem",
                   margin: "0 0 0.25rem",
-                  background: "#ffffff",
-                  color: "#0b5d2a",
-                  padding: "0.2rem 0.6rem",
-                  borderRadius: 8,
-                  border: "1px solid color-mix(in srgb, #0b5d2a 24%, transparent)",
-                  fontFamily: "\"Times New Roman\", Georgia, serif",
-                  fontWeight: 800,
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
+                  color: "var(--text)",
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
                 }}
               >
                 Maika 2026
+                <span
+                  style={{
+                    fontSize: "0.62rem",
+                    lineHeight: 1,
+                    color: "var(--muted)",
+                    opacity: 0.95,
+                    letterSpacing: "0.02em",
+                    fontWeight: 600,
+                    fontFamily: "Inter, system-ui, sans-serif",
+                    textTransform: "none",
+                  }}
+                >
+                  build {BUILD_NUMBER}
+                </span>
               </h1>
               <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.95rem" }}>{session?.username}</p>
             </div>

@@ -176,8 +176,8 @@ function toneCardStyle(tone: "top2" | "barrage" | "other"): CSSProperties {
 }
 
 const zonesWrapStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 16rem), 1fr))",
+  display: "flex",
+  flexDirection: "column",
   gap: "0.75rem",
 };
 const zoneCardStyle: CSSProperties = {

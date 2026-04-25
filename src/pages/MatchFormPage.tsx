@@ -1,6 +1,6 @@
 import { Loader2, Save, X } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { iconButtonBaseStyle } from "../components/IconActionButton";
 import { AppLink } from "../navigation/AppLink";
 import { useAuth } from "../auth/AuthContext";
@@ -39,10 +39,6 @@ export function MatchFormPage({ mode }: { mode: Mode }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!canManageLeague) navigate("/parties", { replace: true });
-  }, [canManageLeague, navigate]);
-
   const players = useMemo(() => {
     const all = data?.players.players ?? [];
     const inEditingMatch =
@@ -57,7 +53,7 @@ export function MatchFormPage({ mode }: { mode: Mode }) {
       .sort((a, b) => a.lastName.localeCompare(b.lastName, "fr") || a.firstName.localeCompare(b.firstName, "fr"));
   }, [data?.players.players, data?.matches.matches, mode, matchId]);
 
-  if (!canManageLeague) return null;
+  if (!canManageLeague) return <Navigate to="/parties" replace />;
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data) return <p>Chargement…</p>;
 
