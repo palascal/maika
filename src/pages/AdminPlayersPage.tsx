@@ -64,7 +64,7 @@ export function AdminPlayersPage() {
         <p style={{ color: "var(--accent)", marginBottom: "1rem", fontSize: "0.95rem" }}>{message}</p>
       ) : null}
       {saveError ? (
-        <p role="alert" style={{ color: "#f87171", marginBottom: "1rem", fontSize: "0.95rem" }}>
+        <p role="alert" style={{ color: "var(--danger)", marginBottom: "1rem", fontSize: "0.95rem" }}>
           {saveError}
         </p>
       ) : null}
@@ -153,7 +153,7 @@ function PlayerEditCard({
       <div style={{ gridColumn: "1 / -1", fontSize: "0.85rem", color: "var(--muted)" }}>
         id : <code>{player.id}</code>
         {playerIsActive(player) ? null : (
-          <span style={{ marginLeft: 8, color: "#fbbf24" }}>(désactivé — hors classements / nouvelles parties)</span>
+          <span style={{ marginLeft: 8, color: "var(--warning-fg)" }}>(désactivé — hors classements / nouvelles parties)</span>
         )}
       </div>
       <label style={labelStyle}>
@@ -335,8 +335,8 @@ const tipTextStyle: CSSProperties = { margin: "0 0 0.45rem", color: "var(--text)
 const readOnlyBoxStyle: CSSProperties = {
   padding: "0.5rem 0.65rem",
   borderRadius: 8,
-  border: "1px solid var(--muted)",
-  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  background: "color-mix(in srgb, var(--bg) 40%, var(--surface))",
   color: "var(--text)",
   fontSize: "1rem",
   fontWeight: 700,
@@ -350,8 +350,8 @@ const readOnlyBoxStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   padding: "0.5rem 0.65rem",
   borderRadius: 8,
-  border: "1px solid var(--muted)",
-  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  background: "var(--surface)",
   color: "var(--text)",
   fontSize: "1rem",
 };
@@ -359,7 +359,7 @@ const inputStyle: CSSProperties = {
 const buttonSecondary: CSSProperties = {
   padding: "0.55rem 1rem",
   borderRadius: 8,
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border-strong)",
   background: "transparent",
   color: "var(--text)",
   fontWeight: 600,
@@ -371,7 +371,7 @@ const buttonPrimary: CSSProperties = {
   borderRadius: 8,
   border: "none",
   background: "var(--accent)",
-  color: "#0f172a",
+  color: "var(--on-accent)",
   fontWeight: 700,
   cursor: "pointer",
 };

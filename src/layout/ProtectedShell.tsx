@@ -13,8 +13,8 @@ function Nav() {
     borderRadius: 8,
     textDecoration: "none",
     fontWeight: 600,
-    background: isActive ? "var(--surface)" : "transparent",
-    color: isActive ? "var(--text)" : "var(--muted)",
+    background: isActive ? "var(--nav-active-bg)" : "transparent",
+    color: isActive ? "var(--nav-active-text)" : "var(--muted)",
   });
 
   const homeLinkStyle = ({ isActive }: { isActive: boolean }) => ({
@@ -25,23 +25,15 @@ function Nav() {
   });
 
   return (
-    <nav
-      style={{
-        display: "flex",
-        gap: 8,
-        marginBottom: "1.25rem",
-        flexWrap: "wrap",
-        alignItems: "center",
-      }}
-    >
-      <ShellNavLink to="/" end style={homeLinkStyle} title="Dashboard — accueil">
-        <span>Dashboard</span>
+    <nav className="app-nav">
+      <ShellNavLink to="/" end style={homeLinkStyle} title="Classement — accueil">
+        <span>Classement</span>
       </ShellNavLink>
       <ShellNavLink to="/parties" style={linkStyle}>
         Parties
       </ShellNavLink>
       <ShellNavLink to="/reglement" style={linkStyle}>
-        Règlement
+        Barêmes
       </ShellNavLink>
       {canManageLeague ? (
         <ShellNavLink to="/admin/joueurs" style={linkStyle}>
@@ -62,7 +54,7 @@ export function ProtectedShell() {
 
   return (
     <>
-      <header style={{ marginBottom: "0.5rem" }}>
+      <header className="app-header">
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
             <SiteLogo size={36} style={{ marginTop: 2, opacity: 0.92 }} decorative />
@@ -110,11 +102,11 @@ export function ProtectedShell() {
                 minWidth: "2.5rem",
                 minHeight: "2.5rem",
                 borderRadius: 10,
-                border: "1px solid var(--muted)",
+                border: "1px solid var(--border-strong)",
                 color: "var(--text)",
                 fontWeight: 600,
                 textDecoration: "none",
-                background: isActive ? "var(--surface)" : "transparent",
+                background: isActive ? "var(--nav-active-bg)" : "transparent",
                 lineHeight: 0,
               })}
             >
@@ -128,7 +120,7 @@ export function ProtectedShell() {
               style={{
                 padding: "0.45rem 0.85rem",
                 borderRadius: 8,
-                border: "1px solid var(--muted)",
+                border: "1px solid var(--border-strong)",
                 background: "transparent",
                 color: "var(--text)",
                 cursor: "pointer",

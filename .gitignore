@@ -2,3 +2,7 @@ node_modules
 dist
 *.local
 .DS_Store
+
+# Icônes PWA générées par scripts/sync-pwa-icons.mjs (copie du logo)
+public/icons/icon-192.png
+public/icons/icon-512.png

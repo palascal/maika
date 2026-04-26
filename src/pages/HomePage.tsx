@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { formatDateLongFr, formatMatchHourDisplay, formatMatchLine, playerById, playerFullName } from "../domain/format";
+import { playerFullName } from "../domain/format";
 import { playerIsActive } from "../domain/playerActive";
 import type { Player } from "../domain/types";
 import { useSeasonData } from "../season/SeasonDataContext";
@@ -31,9 +31,7 @@ export function HomePage() {
     return <p>Chargement…</p>;
   }
 
-  const map = playerById(data.players.players);
   const played = data.matches.matches.filter((m) => m.status === "played");
-  const upcoming = data.matches.matches.filter((m) => m.status === "scheduled");
   const playedCountByPlayer = new Map<string, number>();
   for (const m of played) {
     for (const id of [...m.teamA, ...m.teamB]) {
@@ -74,52 +72,28 @@ export function HomePage() {
           <ZoneCard label="Fond du classement" tone="other" rows={otherRows} />
         </div>
       </section>
-
-      <section style={{ marginBottom: "1.5rem" }}>
-        <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>Dernières parties jouées</h2>
-        {played.length === 0 ? (
-          <p style={{ color: "var(--muted)" }}>Aucune partie enregistrée.</p>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-            {played
-              .slice()
-              .reverse()
-              .slice(0, 5)
-              .map((m) => (
-                <li key={m.id} style={{ marginBottom: 8 }}>
-                  <span style={{ color: "var(--muted)" }}>{formatDateLongFr(m.date)}</span> — {formatMatchLine(m, map)}
-                </li>
-              ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>À venir</h2>
-        {upcoming.length === 0 ? (
-          <p style={{ color: "var(--muted)" }}>Aucune partie planifiée.</p>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-            {upcoming.map((m) => (
-              <li key={m.id} style={{ marginBottom: 8 }}>
-                <span style={{ color: "var(--muted)" }}>
-                  {formatDateLongFr(m.date)}
-                  {m.time ? ` · ${formatMatchHourDisplay(m.time)}` : ""}
-                </span>
-                {m.venue ? ` — ${m.venue}` : ""}
-                <br />
-                {formatMatchLine(m, map)}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </main>
   );
 }
 
-const buttonPrimary: CSSProperties = { padding: "0.45rem 0.9rem", borderRadius: 8, border: "none", background: "var(--accent)", color: "#0f172a", fontWeight: 700, cursor: "pointer" };
-const buttonSecondary: CSSProperties = { padding: "0.45rem 0.9rem", borderRadius: 8, border: "1px solid var(--muted)", background: "transparent", color: "var(--text)", fontWeight: 600, cursor: "pointer" };
+const buttonPrimary: CSSProperties = {
+  padding: "0.45rem 0.9rem",
+  borderRadius: 8,
+  border: "none",
+  background: "var(--accent)",
+  color: "var(--on-accent)",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+const buttonSecondary: CSSProperties = {
+  padding: "0.45rem 0.9rem",
+  borderRadius: 8,
+  border: "1px solid var(--border-strong)",
+  background: "transparent",
+  color: "var(--text)",
+  fontWeight: 600,
+  cursor: "pointer",
+};
 
 function ZoneCard({
   label,
@@ -182,8 +156,9 @@ const zonesWrapStyle: CSSProperties = {
 };
 const zoneCardStyle: CSSProperties = {
   borderRadius: 14,
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border)",
   padding: "0.55rem 0.6rem 0.6rem",
+  boxShadow: "var(--shadow-sm)",
 };
 const zoneLabelStyle: CSSProperties = {
   marginBottom: "0.45rem",
@@ -200,8 +175,8 @@ const rowCardStyle: CSSProperties = {
   gap: 8,
   padding: "0.38rem 0.5rem",
   borderRadius: 8,
-  background: "color-mix(in srgb, var(--bg) 75%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--muted) 40%, transparent)",
+  background: "color-mix(in srgb, var(--bg) 55%, var(--surface))",
+  border: "1px solid var(--border)",
 };
 const rowLeftStyle: CSSProperties = {
   display: "flex",

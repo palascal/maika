@@ -331,7 +331,7 @@ export function AdminConfigPage() {
       </form>
       {message ? <p style={{ color: "var(--accent)", marginTop: 0 }}>{message}</p> : null}
       {applyError ? (
-        <p role="alert" style={{ color: "#f87171", marginTop: 0 }}>
+        <p role="alert" style={{ color: "var(--danger)", marginTop: 0 }}>
           {applyError}
         </p>
       ) : null}
@@ -356,7 +356,8 @@ const sectionsWrapStyle: CSSProperties = {
 const configSectionStyle: CSSProperties = {
   background: "var(--surface)",
   borderRadius: 12,
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border)",
+  boxShadow: "var(--shadow-sm)",
   padding: "0.8rem 0.9rem",
 };
 const sectionTitleStyle: CSSProperties = {
@@ -371,10 +372,10 @@ const subSectionsGridStyle: CSSProperties = {
   gap: "0.75rem",
 };
 const subSectionStyle: CSSProperties = {
-  border: "1px solid color-mix(in srgb, var(--muted) 65%, transparent)",
+  border: "1px solid var(--border)",
   borderRadius: 10,
   padding: "0.65rem 0.7rem",
-  background: "var(--bg)",
+  background: "color-mix(in srgb, var(--bg) 65%, var(--surface))",
 };
 const subSectionTitleStyle: CSSProperties = {
   margin: "0 0 0.55rem",
@@ -403,8 +404,8 @@ const inputStyle: CSSProperties = {
   width: "100%",
   padding: "0.5rem 0.65rem",
   borderRadius: 8,
-  border: "1px solid var(--muted)",
-  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  background: "var(--surface)",
   color: "var(--text)",
   fontSize: "1rem",
   minHeight: "2.5rem",
@@ -412,11 +413,11 @@ const inputStyle: CSSProperties = {
 const buttonPrimary: CSSProperties = {
   border: "none",
   background: "var(--accent)",
-  color: "#0f172a",
+  color: "var(--on-accent)",
   fontWeight: 700,
 };
 const buttonSecondary: CSSProperties = {
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border-strong)",
   background: "transparent",
   color: "var(--text)",
   fontWeight: 600,

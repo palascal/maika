@@ -4,7 +4,6 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import { IconActionButton, iconButtonBaseStyle } from "../components/IconActionButton";
 import { AppLink } from "../navigation/AppLink";
 import { useAuth } from "../auth/AuthContext";
-import { maikaFromSeasonPoints } from "../domain/maika";
 import { playerIsActive } from "../domain/playerActive";
 import { collectPlayerIds, uniquePlayerId } from "../domain/playerId";
 import { posteLabel } from "../domain/ranking";
@@ -35,11 +34,12 @@ function emailPreview(raw?: string): string {
 }
 
 export function AdminPlayersManagementPage() {
-  const { canManageLeague, canAssignElevatedRoles } = useAuth();
+  const { canManageLeague, canAssignElevatedRoles, isAdmin } = useAuth();
   const { data, error, loading, savePlayersFile } = useSeasonData();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"tous" | "actifs" | "inactifs">("tous");
+  const [sortMode, setSortMode] = useState<"alpha" | "poste" | "nbParties">("alpha");
   const [modal, setModal] = useState<null | { mode: "create" } | { mode: "edit"; player: Player }>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -117,14 +117,35 @@ export function AdminPlayersManagementPage() {
     });
   }, [data, query, statusFilter]);
 
+  const playedCountByPlayerId = useMemo(() => {
+    const out = new Map<string, number>();
+    if (!data) return out;
+    for (const m of data.matches.matches) {
+      if (m.status !== "played") continue;
+      for (const id of [...m.teamA, ...m.teamB]) {
+        out.set(id, (out.get(id) ?? 0) + 1);
+      }
+    }
+    return out;
+  }, [data]);
+
   const sorted = useMemo(
     () =>
       filtered.slice().sort((a, b) => {
+        if (sortMode === "poste") {
+          const p = posteLabel(a.poste).localeCompare(posteLabel(b.poste), "fr");
+          if (p !== 0) return p;
+        }
+        if (sortMode === "nbParties") {
+          const aCount = playedCountByPlayerId.get(a.id) ?? 0;
+          const bCount = playedCountByPlayerId.get(b.id) ?? 0;
+          if (aCount !== bCount) return bCount - aCount;
+        }
         const ln = a.lastName.localeCompare(b.lastName, "fr");
         if (ln !== 0) return ln;
         return a.firstName.localeCompare(b.firstName, "fr");
       }),
-    [filtered],
+    [filtered, playedCountByPlayerId, sortMode],
   );
 
   if (!canManageLeague) return <Navigate to="/" replace />;
@@ -162,6 +183,11 @@ export function AdminPlayersManagementPage() {
           <option value="actifs">Actifs seulement</option>
           <option value="inactifs">Désactivés seulement</option>
         </select>
+        <select value={sortMode} onChange={(e) => setSortMode(e.target.value as typeof sortMode)} style={selectStyle}>
+          <option value="alpha">Tri : alphabétique</option>
+          <option value="poste">Tri : poste</option>
+          <option value="nbParties">Tri : nb parties jouées</option>
+        </select>
         <IconActionButton
           label="Créer un nouveau joueur"
           icon={Plus}
@@ -172,22 +198,21 @@ export function AdminPlayersManagementPage() {
       </div>
 
       {saveError ? (
-        <p role="alert" style={{ color: "#f87171", marginBottom: "0.75rem", fontSize: "0.92rem" }}>
+        <p role="alert" style={{ color: "var(--danger)", marginBottom: "0.75rem", fontSize: "0.92rem" }}>
           {saveError}
         </p>
       ) : null}
 
-      <div className="table-scroll" style={{ borderRadius: 12, border: "1px solid var(--muted)", overflow: "hidden" }}>
+      <div className="table-scroll">
         <table style={tableStyle}>
           <thead>
             <tr style={{ background: "var(--surface)" }}>
               <th style={thStyle}>Joueur</th>
+              <th style={thStyle}>Nb parties</th>
               <th style={thStyle}>Poste</th>
-              <th style={thStyle}>Points</th>
-              <th style={thStyle}>Maika</th>
               <th style={thStyle}>E-mail</th>
-              <th style={thStyle}>Rôle</th>
               <th style={{ ...thStyle, whiteSpace: "nowrap", minWidth: 118 }}>État</th>
+              {isAdmin ? <th style={thStyle}>Rôle</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -205,12 +230,11 @@ export function AdminPlayersManagementPage() {
                     <div style={{ fontWeight: 600, minWidth: 0 }}>{p.firstName} {p.lastName}</div>
                   </div>
                 </td>
+                <td style={tdStyle}>{playedCountByPlayerId.get(p.id) ?? 0}</td>
                 <td style={tdStyle}>{posteLabel(p.poste)}</td>
-                <td style={tdStyle}>{p.seasonPoints}</td>
-                <td style={tdStyle}>{maikaFromSeasonPoints(p.seasonPoints)}</td>
                 <td style={tdStyle} title={p.email ?? undefined}>{emailPreview(p.email)}</td>
-                <td style={tdStyle}>{appRoleLabel(p.authRole ?? "user")}</td>
                 <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{playerIsActive(p) ? <span style={badgeOk}>Actif</span> : <span style={badgeOff}>Désactivé</span>}</td>
+                {isAdmin ? <td style={tdStyle}>{appRoleLabel(p.authRole ?? "user")}</td> : null}
               </tr>
             ))}
           </tbody>
@@ -365,10 +389,6 @@ function PlayerModal({
                 autoComplete="off"
                 style={inputStyle}
               />
-              <span style={{ fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.35 }}>
-                Avec Supabase : création ou modification déclenche une synchro vers les comptes Auth (invitation ou mise à
-                jour de l’e-mail). Retirer l’e-mail ici ne supprime pas le compte Auth.
-              </span>
             </label>
             {canAssignElevatedRoles ? (
               <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>
@@ -386,16 +406,16 @@ function PlayerModal({
             )}
             <label style={{ ...labelStyle, gridColumn: "1 / -1", flexDirection: "row", alignItems: "center", gap: 10 }}>
               <input type="checkbox" checked={active} disabled={saving} onChange={(e) => setActive(e.target.checked)} />
-              <span>Joueur actif (classé et sélectionnable pour les nouvelles parties)</span>
+              <span>Joueur Actif</span>
             </label>
           </div>
-          {mode === "edit" && player ? (
+          {mode === "edit" && player && canAssignElevatedRoles ? (
             <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--muted)" }}>
               Identifiant technique : <code>{player.id}</code> (stable pour l’historique des parties).
             </p>
           ) : null}
           {localErr ? (
-            <p role="alert" style={{ margin: 0, color: "#f87171", fontSize: "0.88rem" }}>
+            <p role="alert" style={{ margin: 0, color: "var(--danger)", fontSize: "0.88rem" }}>
               {localErr}
             </p>
           ) : null}
@@ -448,8 +468,8 @@ const searchInputStyle: CSSProperties = {
   minWidth: 180,
   padding: "0.55rem 0.75rem",
   borderRadius: 10,
-  border: "1px solid var(--muted)",
-  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  background: "var(--surface)",
   color: "var(--text)",
   fontSize: "1rem",
 };
@@ -457,8 +477,8 @@ const searchInputStyle: CSSProperties = {
 const selectStyle: CSSProperties = {
   padding: "0.55rem 0.75rem",
   borderRadius: 10,
-  border: "1px solid var(--muted)",
-  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  background: "var(--surface)",
   color: "var(--text)",
   fontSize: "0.95rem",
   minHeight: "2.75rem",
@@ -467,7 +487,7 @@ const selectStyle: CSSProperties = {
 const tableStyle: CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
-  background: "var(--bg)",
+  background: "var(--surface)",
 };
 
 const thStyle: CSSProperties = {
@@ -477,12 +497,12 @@ const thStyle: CSSProperties = {
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   color: "var(--muted)",
-  borderBottom: "1px solid var(--muted)",
+  borderBottom: "1px solid var(--border)",
 };
 
 const tdStyle: CSSProperties = {
   padding: "0.6rem 0.75rem",
-  borderBottom: "1px solid #334155",
+  borderBottom: "1px solid var(--border)",
   verticalAlign: "top",
 };
 
@@ -491,8 +511,8 @@ const badgeOk: CSSProperties = {
   fontWeight: 700,
   padding: "0.2rem 0.5rem",
   borderRadius: 999,
-  background: "rgba(34,197,94,0.15)",
-  color: "#86efac",
+  background: "color-mix(in srgb, var(--success) 14%, var(--surface))",
+  color: "var(--success)",
 };
 
 const badgeOff: CSSProperties = {
@@ -500,14 +520,14 @@ const badgeOff: CSSProperties = {
   fontWeight: 700,
   padding: "0.2rem 0.5rem",
   borderRadius: 999,
-  background: "rgba(251,191,36,0.12)",
-  color: "#fcd34d",
+  background: "color-mix(in srgb, #f59e0b 16%, var(--surface))",
+  color: "var(--warning-fg)",
 };
 
 const smallBtnStyle: CSSProperties = {
   padding: "0.35rem 0.65rem",
   borderRadius: 8,
-  border: "1px solid color-mix(in srgb, var(--accent) 45%, var(--muted))",
+  border: "1px solid color-mix(in srgb, var(--accent) 30%, var(--border))",
   background: "color-mix(in srgb, var(--accent) 12%, transparent)",
   color: "var(--accent)",
   fontWeight: 600,
@@ -519,7 +539,7 @@ const accentBtnStyle: CSSProperties = {
   borderRadius: 10,
   border: "none",
   background: "var(--accent)",
-  color: "#0f172a",
+  color: "var(--on-accent)",
   fontWeight: 700,
   cursor: "pointer",
   fontSize: "0.95rem",
@@ -528,7 +548,7 @@ const accentBtnStyle: CSSProperties = {
 const overlayStyle: CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(15,23,42,0.65)",
+  background: "rgba(15, 23, 42, 0.4)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -544,8 +564,8 @@ const dialogStyle: CSSProperties = {
   background: "var(--surface)",
   borderRadius: 16,
   padding: "1.25rem",
-  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.45)",
-  border: "1px solid var(--muted)",
+  boxShadow: "var(--shadow-lg)",
+  border: "1px solid var(--border)",
 };
 
 const closeBtnStyle: CSSProperties = {
@@ -570,8 +590,8 @@ const labelStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   padding: "0.55rem 0.65rem",
   borderRadius: 8,
-  border: "1px solid var(--muted)",
-  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  background: "var(--surface)",
   color: "var(--text)",
   fontSize: "1rem",
   minHeight: "2.65rem",
@@ -579,7 +599,7 @@ const inputStyle: CSSProperties = {
 
 const secondaryBtnStyle: CSSProperties = {
   borderRadius: 10,
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border-strong)",
   background: "transparent",
   color: "var(--text)",
   fontWeight: 600,

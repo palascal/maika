@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { AppLink } from "../navigation/AppLink";
 import { DEFAULT_MATCH_POINT_SCORING_RULES } from "../domain/matchPointScoring";
 import { InfoTooltip } from "../components/InfoTooltip";
 
@@ -8,14 +7,9 @@ const r = DEFAULT_MATCH_POINT_SCORING_RULES;
 export function ReglementPage() {
   return (
     <main style={{ maxWidth: 640, margin: "0 auto" }}>
-      <p style={{ marginTop: 0, marginBottom: "0.75rem" }}>
-        <AppLink to="/" style={backLinkStyle}>
-          ← Dashboard
-        </AppLink>
-      </p>
       <div style={headingRowStyle}>
-        <h2 style={{ fontSize: "1.2rem", marginTop: 0, marginBottom: 0 }}>Règles de Calculs</h2>
-        <InfoTooltip label="Aide règlement">
+        <h2 style={{ fontSize: "1.2rem", marginTop: 0, marginBottom: 0 }}>Barêmes</h2>
+        <InfoTooltip label="Aide barèmes">
           <p style={tipTextStyle}>
             Texte de référence pour la saison <strong>Maika</strong> (double, barème informatisé).
           </p>
@@ -99,7 +93,6 @@ export function ReglementPage() {
   );
 }
 
-const backLinkStyle: CSSProperties = { fontWeight: 600, textDecoration: "none", color: "var(--muted)" };
 const headingRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -112,7 +105,8 @@ const articleStyle: CSSProperties = {
   background: "var(--surface)",
   borderRadius: 12,
   padding: "1.1rem 1.2rem",
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border)",
+  boxShadow: "var(--shadow-sm)",
 };
 const sectionStyle: CSSProperties = { marginBottom: "1.15rem" };
 const h3Style: CSSProperties = { fontSize: "1rem", margin: "0 0 0.5rem", color: "var(--text)" };
@@ -126,13 +120,13 @@ const tableStyle: CSSProperties = {
 };
 const thStyle: CSSProperties = {
   textAlign: "left",
-  borderBottom: "1px solid var(--muted)",
+  borderBottom: "1px solid var(--border)",
   padding: "0.35rem 0.5rem",
   color: "var(--muted)",
   fontWeight: 600,
 };
 const tdStyle: CSSProperties = {
-  borderBottom: "1px solid color-mix(in srgb, var(--muted) 35%, transparent)",
+  borderBottom: "1px solid var(--border)",
   padding: "0.35rem 0.5rem",
   verticalAlign: "top",
 };

@@ -96,7 +96,7 @@ export function MatchFormPage({ mode }: { mode: Mode }) {
       <h2 style={{ fontSize: "1.15rem", marginTop: 0, fontWeight: 700, letterSpacing: "-0.02em" }}>
         {mode === "add" ? "Nouvelle partie" : "Modifier la partie"}
       </h2>
-      {saveError ? <p role="alert" style={{ color: "#f87171", margin: "0 0 1rem" }}>{saveError}</p> : null}
+      {saveError ? <p role="alert" style={{ color: "var(--danger)", margin: "0 0 1rem" }}>{saveError}</p> : null}
       <MatchForm
         players={players}
         matches={data.matches.matches}
@@ -410,11 +410,11 @@ function PlayerSelect({
 const backLinkStyle: CSSProperties = { fontWeight: 600, textDecoration: "none" };
 const formStyle: CSSProperties = {
   marginTop: "0.35rem",
-  background: "color-mix(in srgb, var(--surface) 88%, var(--bg))",
+  background: "var(--surface)",
   borderRadius: 16,
   padding: "1rem 1.1rem 1.15rem",
-  border: "1px solid color-mix(in srgb, var(--muted) 40%, transparent)",
-  boxShadow: "0 8px 28px color-mix(in srgb, #000 22%, transparent)",
+  border: "1px solid var(--border)",
+  boxShadow: "var(--shadow-md)",
 };
 const metaSectionStyle: CSSProperties = { marginBottom: "1rem" };
 const metaGridStyle: CSSProperties = {
@@ -430,9 +430,9 @@ const teamsRowStyle: CSSProperties = {
 };
 const teamCardStyle: CSSProperties = {
   borderRadius: 12,
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border)",
   padding: "0.85rem 0.9rem 1rem",
-  background: "var(--bg)",
+  background: "color-mix(in srgb, var(--bg) 55%, var(--surface))",
 };
 const teamCardHeaderStyle: CSSProperties = {
   fontSize: "0.72rem",
@@ -465,7 +465,7 @@ const labelSpanStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   padding: "0.5rem 0.6rem",
   borderRadius: 10,
-  border: "1px solid color-mix(in srgb, var(--muted) 65%, transparent)",
+  border: "1px solid var(--border-strong)",
   background: "var(--surface)",
   color: "var(--text)",
   fontSize: "0.95rem",
@@ -476,7 +476,7 @@ const buttonPrimary: CSSProperties = {
   borderRadius: 10,
   border: "none",
   background: "var(--accent)",
-  color: "#0f172a",
+  color: "var(--on-accent)",
   fontWeight: 700,
   cursor: "pointer",
   minHeight: "2.75rem",
@@ -485,7 +485,7 @@ const buttonPrimary: CSSProperties = {
 const buttonSecondary: CSSProperties = {
   padding: "0.55rem 1.1rem",
   borderRadius: 10,
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border-strong)",
   background: "transparent",
   color: "var(--text)",
   fontWeight: 600,

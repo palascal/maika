@@ -9,7 +9,7 @@ import {
   formatTeamLabel,
   playerById,
 } from "../domain/format";
-import { formatPeloteScore, hasPeloteScore } from "../domain/matchScore";
+import { hasPeloteScore } from "../domain/matchScore";
 import { maikaFromSeasonPoints } from "../domain/maika";
 import { matchPointDeltasForPlayedMatch, mergeScoringRules, type MatchPointScoringRules } from "../domain/matchPointScoring";
 import type { Match, MatchStatus, Player, PlayerId } from "../domain/types";
@@ -41,6 +41,19 @@ const compositionRowB: CSSProperties = {
 };
 const compositionNamesStyle: CSSProperties = { flex: "1 1 8rem", minWidth: 0 };
 const compositionScoreStyle: CSSProperties = { fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 };
+const compositionScoreWrapStyle: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8 };
+const compositionPointsWinStyle: CSSProperties = {
+  fontWeight: 700,
+  fontSize: "0.82rem",
+  color: "#14532d",
+  fontVariantNumeric: "tabular-nums",
+};
+const compositionPointsLoseStyle: CSSProperties = {
+  fontWeight: 700,
+  fontSize: "0.82rem",
+  color: "#7f1d1d",
+  fontVariantNumeric: "tabular-nums",
+};
 
 const matchWhenWhereLine1Style: CSSProperties = { fontWeight: 600, fontSize: "0.92rem", lineHeight: 1.35 };
 const matchWhenWhereLine2Style: CSSProperties = {
@@ -62,24 +75,6 @@ function MatchWhenWhereCell({ m }: { m: Match }) {
   );
 }
 
-function MatchCompositionCell({ m, map }: { m: Match; map: Map<PlayerId, Player> }) {
-  const scored = hasPeloteScore(m);
-  return (
-    <div style={compositionStackStyle}>
-      <div style={compositionRowBase}>
-        <span style={compositionNamesStyle}>{formatTeamLabel(m.teamA, map)}</span>
-        {scored ? <span style={compositionScoreStyle}>{m.scoreTeamA}</span> : null}
-      </div>
-      <div style={compositionRowB}>
-        <span style={compositionNamesStyle}>{formatTeamLabel(m.teamB, map)}</span>
-        {scored ? <span style={compositionScoreStyle}>{m.scoreTeamB}</span> : null}
-      </div>
-    </div>
-  );
-}
-
-const today = () => new Date().toISOString().slice(0, 10);
-
 type MatchDebug = {
   levelGapEq1MinusEq2: number | null;
   scoreGap: number | null;
@@ -88,6 +83,43 @@ type MatchDebug = {
   winEq2: number | null;
   loseEq2: number | null;
 };
+
+function signedPoints(value: number | null): string {
+  if (value == null) return "";
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
+function MatchCompositionCell({ m, map, debug }: { m: Match; map: Map<PlayerId, Player>; debug?: MatchDebug }) {
+  const scored = hasPeloteScore(m);
+  const pointsA = debug ? (debug.winEq1 ?? debug.loseEq1) : null;
+  const pointsB = debug ? (debug.winEq2 ?? debug.loseEq2) : null;
+  const pointsAStyle = (pointsA ?? 0) >= 0 ? compositionPointsWinStyle : compositionPointsLoseStyle;
+  const pointsBStyle = (pointsB ?? 0) >= 0 ? compositionPointsWinStyle : compositionPointsLoseStyle;
+  return (
+    <div style={compositionStackStyle}>
+      <div style={compositionRowBase}>
+        <span style={compositionNamesStyle}>{formatTeamLabel(m.teamA, map)}</span>
+        {scored ? (
+          <span style={compositionScoreWrapStyle}>
+            <span style={compositionScoreStyle}>{m.scoreTeamA}</span>
+            {pointsA != null ? <span style={pointsAStyle}>{signedPoints(pointsA)}</span> : null}
+          </span>
+        ) : null}
+      </div>
+      <div style={compositionRowB}>
+        <span style={compositionNamesStyle}>{formatTeamLabel(m.teamB, map)}</span>
+        {scored ? (
+          <span style={compositionScoreWrapStyle}>
+            <span style={compositionScoreStyle}>{m.scoreTeamB}</span>
+            {pointsB != null ? <span style={pointsBStyle}>{signedPoints(pointsB)}</span> : null}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
 
 function victoryPoints(opponentMinusWinner: number, rules: MatchPointScoringRules): number {
   if (opponentMinusWinner >= 2) return rules.victoryOpponentMinusWinnerGte2;
@@ -185,7 +217,7 @@ export function MatchesPage() {
     <main>
       <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>Parties</h2>
       {deleteError ? (
-        <p role="alert" style={{ color: "#f87171", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
+        <p role="alert" style={{ color: "var(--danger)", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
           {deleteError}
         </p>
       ) : null}
@@ -206,7 +238,6 @@ export function MatchesPage() {
             <tr>
               <th style={thStyle}>Date</th>
               <th style={thStyle}>Composition</th>
-              <th style={thStyle}>Score</th>
               <th style={thStyle}>Statut</th>
               {isAdmin ? <th style={thStyle}>Écart niveau</th> : null}
               {isAdmin ? <th style={thStyle}>Écart score</th> : null}
@@ -222,9 +253,8 @@ export function MatchesPage() {
               <tr key={m.id}>
                 <MatchWhenWhereCell m={m} />
                 <td style={tdStyle}>
-                  <MatchCompositionCell m={m} map={map} />
+                  <MatchCompositionCell m={m} map={map} debug={debugByMatchId.get(m.id)} />
                 </td>
-                <td style={tdStyle}>{formatPeloteScore(m)?.replace(" – ", "-") ?? "—"}</td>
                 <td style={tdStyle}>{matchStatusLabel(m.status)}</td>
                 {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.levelGapEq1MinusEq2 ?? "—"}</td> : null}
                 {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.scoreGap ?? "—"}</td> : null}
@@ -276,23 +306,23 @@ const tableStyle: CSSProperties = {
   borderRadius: 12,
   overflow: "hidden",
 };
-const thStyle: CSSProperties = { textAlign: "left", padding: "0.6rem", borderBottom: "1px solid var(--muted)" };
-const tdStyle: CSSProperties = { padding: "0.6rem", borderBottom: "1px solid #334155" };
+const thStyle: CSSProperties = { textAlign: "left", padding: "0.6rem", borderBottom: "1px solid var(--border)" };
+const tdStyle: CSSProperties = { padding: "0.6rem", borderBottom: "1px solid var(--border)" };
 const buttonPrimary: CSSProperties = {
   border: "none",
   background: "var(--accent)",
-  color: "#0f172a",
+  color: "var(--on-accent)",
   fontWeight: 700,
 };
 const buttonSecondary: CSSProperties = {
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border-strong)",
   background: "transparent",
   color: "var(--text)",
   fontWeight: 600,
 };
 const buttonDanger: CSSProperties = {
-  border: "1px solid #f87171",
-  background: "color-mix(in srgb, #f87171 12%, transparent)",
-  color: "#fecaca",
+  border: "1px solid color-mix(in srgb, var(--danger) 45%, var(--border))",
+  background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
+  color: "var(--danger)",
   fontWeight: 600,
 };

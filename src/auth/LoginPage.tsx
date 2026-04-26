@@ -102,6 +102,8 @@ export function LoginPage() {
           background: "var(--surface)",
           padding: "1.25rem",
           borderRadius: 12,
+          border: "1px solid var(--border)",
+          boxShadow: "var(--shadow-md)",
         }}
       >
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -150,12 +152,12 @@ export function LoginPage() {
           </div>
         ) : null}
         {resetInfo ? (
-          <p role="status" style={{ margin: 0, color: "#86efac", fontSize: "0.9rem", lineHeight: 1.45 }}>
+          <p role="status" style={{ margin: 0, color: "var(--success)", fontSize: "0.9rem", lineHeight: 1.45 }}>
             {resetInfo}
           </p>
         ) : null}
         {error ? (
-          <p role="alert" style={{ margin: 0, color: "#f87171", fontSize: "0.9rem" }}>
+          <p role="alert" style={{ margin: 0, color: "var(--danger)", fontSize: "0.9rem" }}>
             {error}
           </p>
         ) : null}
@@ -180,8 +182,8 @@ export function LoginPage() {
 const inputStyle: CSSProperties = {
   padding: "0.6rem 0.75rem",
   borderRadius: 8,
-  border: "1px solid var(--muted)",
-  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  background: "var(--surface)",
   color: "var(--text)",
   fontSize: "1rem",
 };
@@ -191,7 +193,7 @@ const buttonStyle: CSSProperties = {
   borderRadius: 8,
   border: "none",
   background: "var(--accent)",
-  color: "#0f172a",
+  color: "var(--on-accent)",
   fontWeight: 700,
   cursor: "pointer",
   fontSize: "1rem",
@@ -201,8 +203,8 @@ const passwordWrapStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   borderRadius: 8,
-  border: "1px solid var(--muted)",
-  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  background: "var(--surface)",
 };
 
 const passwordInputStyle: CSSProperties = {

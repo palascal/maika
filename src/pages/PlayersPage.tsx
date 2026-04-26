@@ -106,8 +106,8 @@ const tableStyle: CSSProperties = {
   borderRadius: 12,
   overflow: "hidden",
 };
-const thStyle: CSSProperties = { textAlign: "left", padding: "0.6rem", borderBottom: "1px solid var(--muted)" };
-const tdStyle: CSSProperties = { padding: "0.6rem", borderBottom: "1px solid #334155" };
+const thStyle: CSSProperties = { textAlign: "left", padding: "0.6rem", borderBottom: "1px solid var(--border)" };
+const tdStyle: CSSProperties = { padding: "0.6rem", borderBottom: "1px solid var(--border)" };
 const headingRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",

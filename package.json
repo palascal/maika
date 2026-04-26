@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/sync-logo.mjs && node scripts/sync-pwa-icons.mjs && vite",
     "bump:build": "node scripts/bump-build.mjs",
-    "prebuild": "node scripts/sync-logo.mjs",
+    "prebuild": "node scripts/sync-logo.mjs && node scripts/sync-pwa-icons.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "deploy:admin-sync-player-emails": "supabase functions deploy admin-sync-player-emails"

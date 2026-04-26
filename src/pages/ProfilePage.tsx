@@ -152,12 +152,12 @@ export function ProfilePage() {
               />
             </label>
             {message ? (
-              <p role="status" style={{ margin: 0, color: "#86efac", fontSize: "0.9rem" }}>
+              <p role="status" style={{ margin: 0, color: "var(--success)", fontSize: "0.9rem" }}>
                 {message}
               </p>
             ) : null}
             {error ? (
-              <p role="alert" style={{ margin: 0, color: "#f87171", fontSize: "0.9rem" }}>
+              <p role="alert" style={{ margin: 0, color: "var(--danger)", fontSize: "0.9rem" }}>
                 {error}
               </p>
             ) : null}
@@ -192,7 +192,8 @@ const cardStyle: CSSProperties = {
   background: "var(--surface)",
   borderRadius: 12,
   padding: "1.1rem 1.15rem",
-  border: "1px solid var(--muted)",
+  border: "1px solid var(--border)",
+  boxShadow: "var(--shadow-sm)",
 };
 const dtStyle: CSSProperties = { margin: 0, color: "var(--muted)", fontSize: "0.85rem" };
 const ddStyle: CSSProperties = { margin: 0, fontWeight: 600, fontSize: "0.95rem" };
@@ -200,8 +201,8 @@ const labelStyle: CSSProperties = { display: "flex", flexDirection: "column", ga
 const inputStyle: CSSProperties = {
   padding: "0.55rem 0.65rem",
   borderRadius: 8,
-  border: "1px solid var(--muted)",
-  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  background: "var(--surface)",
   color: "var(--text)",
   fontSize: "1rem",
   minHeight: "2.65rem",
@@ -211,7 +212,7 @@ const submitStyle: CSSProperties = {
   borderRadius: 8,
   border: "none",
   background: "var(--accent)",
-  color: "#0f172a",
+  color: "var(--on-accent)",
   fontWeight: 700,
   cursor: "pointer",
   fontSize: "1rem",
