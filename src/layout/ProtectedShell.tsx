@@ -1,10 +1,12 @@
-import { UserRound } from "lucide-react";
+import { CircleHelp, UserRound } from "lucide-react";
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
+import { MaikaPointsHelpDialog } from "../components/MaikaPointsHelpDialog";
 import { SiteLogo } from "../components/SiteLogo";
 import { BUILD_NUMBER } from "../buildInfo";
 import { useAuth } from "../auth/AuthContext";
 import { ShellNavLink } from "../navigation/AppLink";
-import { SeasonDataProvider } from "../season/SeasonDataContext";
+import { SeasonDataProvider, useSeasonData } from "../season/SeasonDataContext";
 
 function Nav() {
   const { canManageLeague, canAccessConfig } = useAuth();
@@ -32,9 +34,6 @@ function Nav() {
       <ShellNavLink to="/parties" style={linkStyle}>
         Parties
       </ShellNavLink>
-      <ShellNavLink to="/reglement" style={linkStyle}>
-        Barêmes
-      </ShellNavLink>
       {canManageLeague ? (
         <ShellNavLink to="/admin/joueurs" style={linkStyle}>
           Joueurs
@@ -50,10 +49,38 @@ function Nav() {
 }
 
 export function ProtectedShell() {
+  return (
+    <SeasonDataProvider>
+      <ProtectedShellContent />
+    </SeasonDataProvider>
+  );
+}
+
+function ProtectedShellContent() {
   const { session, logout } = useAuth();
+  const { data } = useSeasonData();
+  const seasonLabel = data?.players.seasonLabel?.trim() || "Maika";
+  const [maikaHelpOpen, setMaikaHelpOpen] = useState(false);
+
+  const helpButtonStyle = {
+    display: "inline-flex" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    padding: "0.45rem 0.55rem",
+    minWidth: "2.5rem",
+    minHeight: "2.5rem",
+    borderRadius: 10,
+    border: "1px solid var(--border-strong)",
+    color: "var(--text)",
+    fontWeight: 600,
+    lineHeight: 0,
+    cursor: "pointer" as const,
+    background: maikaHelpOpen ? "var(--nav-active-bg)" : "transparent",
+  };
 
   return (
     <>
+      <MaikaPointsHelpDialog open={maikaHelpOpen} onClose={() => setMaikaHelpOpen(false)} />
       <header className="app-header">
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
@@ -70,7 +97,7 @@ export function ProtectedShell() {
                   gap: 8,
                 }}
               >
-                Maika 2026
+                Maïka {seasonLabel}
                 <span
                   style={{
                     fontSize: "0.62rem",
@@ -90,6 +117,16 @@ export function ProtectedShell() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              title="Calcul des points Maïka"
+              aria-label="Calcul des points Maïka"
+              aria-expanded={maikaHelpOpen}
+              onClick={() => setMaikaHelpOpen(true)}
+              style={helpButtonStyle}
+            >
+              <CircleHelp size={20} strokeWidth={2} aria-hidden focusable={false} style={{ opacity: maikaHelpOpen ? 1 : 0.88 }} />
+            </button>
             <ShellNavLink
               to="/profil"
               title="Profil — compte et mot de passe"
@@ -133,9 +170,7 @@ export function ProtectedShell() {
         </div>
       </header>
       <Nav />
-      <SeasonDataProvider>
-        <Outlet />
-      </SeasonDataProvider>
+      <Outlet />
     </>
   );
 }

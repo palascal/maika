@@ -10,28 +10,16 @@ import {
   normalizeMatchHour,
 } from "../domain/format";
 import { playerIsActive } from "../domain/playerActive";
+import { playerCompactName } from "../domain/format";
 import type { Match, MatchStatus, MatchesFile, Player, PlayerId } from "../domain/types";
 import { useSeasonData } from "../season/SeasonDataContext";
 
 const today = () => new Date().toISOString().slice(0, 10);
-const VENUE_OPTIONS = ["La Cancha", "Argoulets", "Blagnac"] as const;
+const PREDEFINED_VENUES = ["La Cancha", "Argoulets", "Blagnac"] as const;
+/** Même glyphe que l’option vide « Heure » (tiret cadratin U+2014). */
+const VENUE_NONE = "—";
 
-type Mode = "add" | "edit";
-
-function splitDoublesByPoste(ids: [PlayerId, PlayerId], byId: Map<PlayerId, Player>): { arriere: string; avant: string } {
-  const [a, b] = ids;
-  const pa = byId.get(a);
-  const pb = byId.get(b);
-  if (pa?.poste === "arriere" && pb?.poste === "avant") return { arriere: a, avant: b };
-  if (pa?.poste === "avant" && pb?.poste === "arriere") return { arriere: b, avant: a };
-  if (pa?.poste === "arriere") return { arriere: a, avant: pb?.poste === "avant" ? b : "" };
-  if (pb?.poste === "arriere") return { arriere: b, avant: pa?.poste === "avant" ? a : "" };
-  if (pa?.poste === "avant") return { arriere: pb?.poste === "arriere" ? b : "", avant: a };
-  if (pb?.poste === "avant") return { arriere: pa?.poste === "arriere" ? a : "", avant: b };
-  return { arriere: a, avant: b };
-}
-
-export function MatchFormPage({ mode }: { mode: Mode }) {
+export function MatchFormPage() {
   const { matchId } = useParams();
   const navigate = useNavigate();
   const { canManageLeague } = useAuth();
@@ -41,8 +29,7 @@ export function MatchFormPage({ mode }: { mode: Mode }) {
 
   const players = useMemo(() => {
     const all = data?.players.players ?? [];
-    const inEditingMatch =
-      mode === "edit" && matchId ? data?.matches.matches.find((m) => m.id === matchId) : undefined;
+    const inEditingMatch = matchId ? data?.matches.matches.find((m) => m.id === matchId) : undefined;
     const allowInactive = new Set<PlayerId>();
     if (inEditingMatch) {
       for (const id of [...inEditingMatch.teamA, ...inEditingMatch.teamB]) allowInactive.add(id);
@@ -51,13 +38,13 @@ export function MatchFormPage({ mode }: { mode: Mode }) {
       .filter((p) => playerIsActive(p) || allowInactive.has(p.id))
       .slice()
       .sort((a, b) => a.lastName.localeCompare(b.lastName, "fr") || a.firstName.localeCompare(b.firstName, "fr"));
-  }, [data?.players.players, data?.matches.matches, mode, matchId]);
+  }, [data?.players.players, data?.matches.matches, matchId]);
 
   if (!canManageLeague) return <Navigate to="/parties" replace />;
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data) return <p>Chargement…</p>;
 
-  if (mode === "edit" && (!matchId || !data.matches.matches.some((m) => m.id === matchId))) {
+  if (!matchId || !data.matches.matches.some((m) => m.id === matchId)) {
     return (
       <main>
         <p>Partie introuvable.</p>
@@ -93,14 +80,13 @@ export function MatchFormPage({ mode }: { mode: Mode }) {
           ← Retour aux parties
         </AppLink>
       </p>
-      <h2 style={{ fontSize: "1.15rem", marginTop: 0, fontWeight: 700, letterSpacing: "-0.02em" }}>
-        {mode === "add" ? "Nouvelle partie" : "Modifier la partie"}
-      </h2>
+      <h2 style={{ fontSize: "1.15rem", marginTop: 0, fontWeight: 700, letterSpacing: "-0.02em" }}>Modifier la partie</h2>
       {saveError ? <p role="alert" style={{ color: "var(--danger)", margin: "0 0 1rem" }}>{saveError}</p> : null}
       <MatchForm
         players={players}
         matches={data.matches.matches}
-        editingMatchId={mode === "edit" ? matchId : undefined}
+        seasonId={data.matches.seasonId}
+        editingMatchId={matchId}
         saving={saving}
         onSubmit={persist}
         onCancel={() => navigate("/parties")}
@@ -109,41 +95,49 @@ export function MatchFormPage({ mode }: { mode: Mode }) {
   );
 }
 
-function MatchForm({
+export function MatchForm({
   players,
   matches,
+  seasonId,
   editingMatchId,
   saving,
   onSubmit,
   onCancel,
+  embeddedInModal,
 }: {
   players: Player[];
   matches: Match[];
+  seasonId: string;
   editingMatchId?: string;
   saving: boolean;
   onSubmit: (matches: Match[]) => Promise<void>;
   onCancel?: () => void;
+  /** Formulaire dans une fenêtre modale (même look & feel que l’admin joueurs). */
+  embeddedInModal?: boolean;
 }) {
-  const playerMap = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  const [formError, setFormError] = useState<string | null>(null);
   const editingMatch = editingMatchId ? (matches.find((m) => m.id === editingMatchId) ?? null) : null;
 
   const initialSlots = useMemo(() => {
     if (!editingMatch) {
-      return { aA: "", aAv: "", bA: "", bAv: "" };
+      return { a1: "", a2: "", b1: "", b2: "" };
     }
-    const ta = splitDoublesByPoste(editingMatch.teamA, playerMap);
-    const tb = splitDoublesByPoste(editingMatch.teamB, playerMap);
-    return { aA: ta.arriere, aAv: ta.avant, bA: tb.arriere, bAv: tb.avant };
-  }, [editingMatch, playerMap]);
+    return {
+      a1: editingMatch.teamA[0] ?? "",
+      a2: editingMatch.teamA[1] ?? "",
+      b1: editingMatch.teamB[0] ?? "",
+      b2: editingMatch.teamB[1] ?? "",
+    };
+  }, [editingMatch]);
 
   const [date, setDate] = useState(editingMatch?.date ?? today());
   const [time, setTime] = useState(normalizeMatchHour(editingMatch?.time));
-  const [venue, setVenue] = useState(editingMatch?.venue ?? "La Cancha");
+  const [venue, setVenue] = useState(editingMatch?.venue?.trim() ? editingMatch.venue : VENUE_NONE);
   const [status, setStatus] = useState<MatchStatus>(editingMatch?.status ?? "scheduled");
-  const [teamA_arriere, setTeamA_arriere] = useState(initialSlots.aA);
-  const [teamA_avant, setTeamA_avant] = useState(initialSlots.aAv);
-  const [teamB_arriere, setTeamB_arriere] = useState(initialSlots.bA);
-  const [teamB_avant, setTeamB_avant] = useState(initialSlots.bAv);
+  const [teamA_player1, setTeamA_player1] = useState(initialSlots.a1);
+  const [teamA_player2, setTeamA_player2] = useState(initialSlots.a2);
+  const [teamB_player1, setTeamB_player1] = useState(initialSlots.b1);
+  const [teamB_player2, setTeamB_player2] = useState(initialSlots.b2);
   const [scoreTeamA, setScoreTeamA] = useState(String(editingMatch?.scoreTeamA ?? ""));
   const [scoreTeamB, setScoreTeamB] = useState(String(editingMatch?.scoreTeamB ?? ""));
 
@@ -155,34 +149,47 @@ function MatchForm({
     return base;
   }, [time]);
 
+  const venueSelectOptions = useMemo(() => {
+    const cur = venue.trim();
+    const predefined = [...PREDEFINED_VENUES];
+    const extra: string[] = [];
+    if (cur && cur !== VENUE_NONE && !predefined.includes(cur as (typeof PREDEFINED_VENUES)[number])) extra.push(cur);
+    return [VENUE_NONE, ...extra, ...predefined];
+  }, [venue]);
+
   useEffect(() => {
     if (!editingMatch) return;
     setDate(editingMatch.date);
     setTime(normalizeMatchHour(editingMatch.time));
-    setVenue(editingMatch.venue ?? "La Cancha");
+    setVenue(editingMatch.venue?.trim() ? editingMatch.venue : VENUE_NONE);
     setStatus(editingMatch.status);
-    const ta = splitDoublesByPoste(editingMatch.teamA, playerMap);
-    const tb = splitDoublesByPoste(editingMatch.teamB, playerMap);
-    setTeamA_arriere(ta.arriere);
-    setTeamA_avant(ta.avant);
-    setTeamB_arriere(tb.arriere);
-    setTeamB_avant(tb.avant);
+    setTeamA_player1(editingMatch.teamA[0] ?? "");
+    setTeamA_player2(editingMatch.teamA[1] ?? "");
+    setTeamB_player1(editingMatch.teamB[0] ?? "");
+    setTeamB_player2(editingMatch.teamB[1] ?? "");
     setScoreTeamA(editingMatch.scoreTeamA == null ? "" : String(editingMatch.scoreTeamA));
     setScoreTeamB(editingMatch.scoreTeamB == null ? "" : String(editingMatch.scoreTeamB));
-  }, [editingMatchId, editingMatch, playerMap]);
+  }, [editingMatchId, editingMatch]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!teamA_arriere || !teamA_avant || !teamB_arriere || !teamB_avant) return;
+    setFormError(null);
+    const normalizedSeasonId = seasonId.trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(normalizedSeasonId)) {
+      setFormError("Saison invalide : identifiant manquant ou incorrect. Ouvrez Config puis réessayez.");
+      return;
+    }
+    if (!teamA_player1 || !teamA_player2 || !teamB_player1 || !teamB_player2) return;
+    const venueTrim = venue.trim();
     const base: Match = {
       id: editingMatch?.id ?? `match-${Date.now()}`,
-      seasonId: editingMatch?.seasonId ?? (matches[0]?.seasonId || "saison"),
+      seasonId: editingMatch?.seasonId ?? normalizedSeasonId,
       date,
-      venue: venue.trim(),
       status,
-      teamA: [teamA_arriere as PlayerId, teamA_avant as PlayerId],
-      teamB: [teamB_arriere as PlayerId, teamB_avant as PlayerId],
+      teamA: [teamA_player1 as PlayerId, teamA_player2 as PlayerId],
+      teamB: [teamB_player1 as PlayerId, teamB_player2 as PlayerId],
     };
+    if (venueTrim && venueTrim !== VENUE_NONE) base.venue = venueTrim;
     const t = time.trim();
     if (t) base.time = t;
     if (status === "played") {
@@ -196,14 +203,30 @@ function MatchForm({
     await onSubmit(next);
   }
 
-  const otherIds = (slot: "aAr" | "aAv" | "bAr" | "bAv") => {
-    const m = { aAr: teamA_arriere, aAv: teamA_avant, bAr: teamB_arriere, bAv: teamB_avant };
+  const otherIds = (slot: "a1" | "a2" | "b1" | "b2") => {
+    const m = { a1: teamA_player1, a2: teamA_player2, b1: teamB_player1, b2: teamB_player2 };
     const cur = m[slot];
-    return [teamA_arriere, teamA_avant, teamB_arriere, teamB_avant].filter((id) => id && id !== cur);
+    return [teamA_player1, teamA_player2, teamB_player1, teamB_player2].filter((id) => id && id !== cur);
   };
 
+  const formShellStyle: CSSProperties = embeddedInModal
+    ? {
+        marginTop: 0,
+        background: "transparent",
+        borderRadius: 0,
+        padding: 0,
+        border: "none",
+        boxShadow: "none",
+      }
+    : formStyle;
+
   return (
-    <form onSubmit={(e) => void submit(e)} style={formStyle}>
+    <form onSubmit={(e) => void submit(e)} style={formShellStyle}>
+      {formError ? (
+        <p role="alert" style={{ margin: "0 0 0.7rem", color: "var(--danger)" }}>
+          {formError}
+        </p>
+      ) : null}
       <section style={metaSectionStyle}>
         <div style={metaGridStyle}>
           <label style={labelCompactStyle}>
@@ -211,7 +234,7 @@ function MatchForm({
             <input type="date" value={date} disabled={saving} onChange={(e) => setDate(e.target.value)} required style={inputStyle} />
           </label>
           <label style={labelCompactStyle}>
-            <span style={labelSpanStyle}>Heure (9h–22h)</span>
+            <span style={labelSpanStyle}>Heure</span>
             <select value={time} disabled={saving} onChange={(e) => setTime(e.target.value)} style={inputStyle}>
               <option value="">—</option>
               {heureOptions.map((hourVal) => (
@@ -224,7 +247,7 @@ function MatchForm({
           <label style={labelCompactStyle}>
             <span style={labelSpanStyle}>Lieu</span>
             <select value={venue} disabled={saving} onChange={(e) => setVenue(e.target.value)} style={inputStyle}>
-              {VENUE_OPTIONS.map((option) => (
+              {venueSelectOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
@@ -246,13 +269,13 @@ function MatchForm({
         <TeamCard
           title="Équipe 1"
           accent="var(--accent)"
-          arriereId={teamA_arriere}
-          avantId={teamA_avant}
-          onArriere={setTeamA_arriere}
-          onAvant={setTeamA_avant}
+          player1Id={teamA_player1}
+          player2Id={teamA_player2}
+          onPlayer1={setTeamA_player1}
+          onPlayer2={setTeamA_player2}
           players={players}
-          excludedArriere={otherIds("aAr")}
-          excludedAvant={otherIds("aAv")}
+          excludedPlayer1={otherIds("a1")}
+          excludedPlayer2={otherIds("a2")}
           saving={saving}
           status={status}
           score={scoreTeamA}
@@ -262,13 +285,13 @@ function MatchForm({
         <TeamCard
           title="Équipe 2"
           accent="#94a3b8"
-          arriereId={teamB_arriere}
-          avantId={teamB_avant}
-          onArriere={setTeamB_arriere}
-          onAvant={setTeamB_avant}
+          player1Id={teamB_player1}
+          player2Id={teamB_player2}
+          onPlayer1={setTeamB_player1}
+          onPlayer2={setTeamB_player2}
           players={players}
-          excludedArriere={otherIds("bAr")}
-          excludedAvant={otherIds("bAv")}
+          excludedPlayer1={otherIds("b1")}
+          excludedPlayer2={otherIds("b2")}
           saving={saving}
           status={status}
           score={scoreTeamB}
@@ -277,7 +300,28 @@ function MatchForm({
         />
       </div>
 
-      <div className="form-actions" style={{ marginTop: "1rem", display: "flex", flexWrap: "wrap", gap: 10 }}>
+      <div
+        className="form-actions"
+        style={{
+          marginTop: embeddedInModal ? "0.85rem" : "1rem",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          justifyContent: "flex-end",
+        }}
+      >
+        {onCancel ? (
+          <button
+            type="button"
+            disabled={saving}
+            aria-label="Annuler"
+            title="Annuler"
+            style={{ ...iconButtonBaseStyle, ...buttonSecondary, padding: "0.55rem 0.85rem" }}
+            onClick={onCancel}
+          >
+            <X size={20} strokeWidth={2} aria-hidden focusable={false} />
+          </button>
+        ) : null}
         <button
           type="submit"
           disabled={saving}
@@ -291,18 +335,6 @@ function MatchForm({
             <Save size={20} strokeWidth={2} aria-hidden focusable={false} />
           )}
         </button>
-        {onCancel ? (
-          <button
-            type="button"
-            disabled={saving}
-            aria-label="Annuler"
-            title="Annuler"
-            style={{ ...iconButtonBaseStyle, ...buttonSecondary, padding: "0.55rem 0.85rem" }}
-            onClick={onCancel}
-          >
-            <X size={20} strokeWidth={2} aria-hidden focusable={false} />
-          </button>
-        ) : null}
       </div>
     </form>
   );
@@ -311,13 +343,13 @@ function MatchForm({
 function TeamCard({
   title,
   accent,
-  arriereId,
-  avantId,
-  onArriere,
-  onAvant,
+  player1Id,
+  player2Id,
+  onPlayer1,
+  onPlayer2,
   players,
-  excludedArriere,
-  excludedAvant,
+  excludedPlayer1,
+  excludedPlayer2,
   saving,
   status,
   score,
@@ -326,13 +358,13 @@ function TeamCard({
 }: {
   title: string;
   accent: string;
-  arriereId: string;
-  avantId: string;
-  onArriere: (v: string) => void;
-  onAvant: (v: string) => void;
+  player1Id: string;
+  player2Id: string;
+  onPlayer1: (v: string) => void;
+  onPlayer2: (v: string) => void;
   players: Player[];
-  excludedArriere: string[];
-  excludedAvant: string[];
+  excludedPlayer1: string[];
+  excludedPlayer2: string[];
   saving: boolean;
   status: MatchStatus;
   score: string;
@@ -342,27 +374,25 @@ function TeamCard({
   return (
     <div style={{ ...teamCardStyle, borderColor: "color-mix(in srgb, var(--muted) 55%, transparent)" }}>
       <div style={{ ...teamCardHeaderStyle, borderLeftColor: accent }}>{title}</div>
-      <div style={postesGridStyle}>
+      <div style={playersGridStyle}>
         <label style={labelCompactStyle}>
-          <span style={labelSpanStyle}>Arrière</span>
+          <span style={labelSpanStyle}>Joueur 1</span>
           <PlayerSelect
             players={players}
-            poste="arriere"
-            value={arriereId}
-            setValue={onArriere}
+            value={player1Id}
+            setValue={onPlayer1}
             saving={saving}
-            excludedIds={excludedArriere}
+            excludedIds={excludedPlayer1}
           />
         </label>
         <label style={labelCompactStyle}>
-          <span style={labelSpanStyle}>Avant</span>
+          <span style={labelSpanStyle}>Joueur 2</span>
           <PlayerSelect
             players={players}
-            poste="avant"
-            value={avantId}
-            setValue={onAvant}
+            value={player2Id}
+            setValue={onPlayer2}
             saving={saving}
-            excludedIds={excludedAvant}
+            excludedIds={excludedPlayer2}
           />
         </label>
       </div>
@@ -378,14 +408,12 @@ function TeamCard({
 
 function PlayerSelect({
   players,
-  poste,
   value,
   setValue,
   saving,
   excludedIds,
 }: {
   players: Player[];
-  poste: Player["poste"];
   value: string;
   setValue: (value: string) => void;
   saving: boolean;
@@ -393,14 +421,14 @@ function PlayerSelect({
 }) {
   const available = players.filter((p) => {
     if (p.id === value) return true;
-    return p.poste === poste && !excludedIds.includes(p.id);
+    return !excludedIds.includes(p.id);
   });
   return (
     <select value={value} disabled={saving} onChange={(e) => setValue(e.target.value)} style={inputStyle}>
       <option value="">—</option>
       {available.map((p) => (
         <option key={p.id} value={p.id}>
-          {p.firstName} {p.lastName}
+          {playerCompactName(p)}
         </option>
       ))}
     </select>
@@ -444,7 +472,7 @@ const teamCardHeaderStyle: CSSProperties = {
   paddingLeft: 10,
   borderLeft: "3px solid",
 };
-const postesGridStyle: CSSProperties = {
+const playersGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 10rem), 1fr))",
   gap: "0.65rem",

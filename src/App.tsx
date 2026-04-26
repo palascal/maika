@@ -9,7 +9,6 @@ import { MatchFormPage } from "./pages/MatchFormPage";
 import { MatchesPage } from "./pages/MatchesPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { PlayersPage } from "./pages/PlayersPage";
-import { ReglementPage } from "./pages/ReglementPage";
 
 function RedirectAdminPlayerEdit() {
   const { playerId } = useParams();
@@ -25,10 +24,10 @@ export function App() {
         <Route element={<ProtectedShell />}>
           <Route index element={<HomePage />} />
           <Route path="parties" element={<MatchesPage />} />
-          <Route path="parties/ajout" element={<MatchFormPage mode="add" />} />
-          <Route path="parties/:matchId/modifier" element={<MatchFormPage mode="edit" />} />
+          <Route path="parties/ajout" element={<Navigate to="/parties?nouveau=1" replace />} />
+          <Route path="parties/:matchId/modifier" element={<MatchFormPage />} />
           <Route path="joueurs" element={<PlayersPage />} />
-          <Route path="reglement" element={<ReglementPage />} />
+          <Route path="reglement" element={<Navigate to="/" replace />} />
           <Route path="joueurs/ajout" element={<Navigate to="/admin/joueurs?nouveau=1" replace />} />
           <Route path="joueurs/:playerId/modifier" element={<RedirectAdminPlayerEdit />} />
           <Route path="admin/joueurs" element={<AdminPlayersManagementPage />} />

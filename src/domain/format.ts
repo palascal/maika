@@ -80,6 +80,23 @@ export function playerFullName(p: Player): string {
   return `${p.firstName} ${p.lastName}`.trim();
 }
 
+/** Nom puis prénom (ex. administration des joueurs). */
+export function playerLastFirstName(p: Player): string {
+  return `${p.lastName} ${p.firstName}`.trim();
+}
+
+/** Ex. « Dupond T » — nom + initiale du prénom (listes / classements, fratries). */
+export function playerCompactName(p: Player): string {
+  const ln = p.lastName.trim();
+  const fn = p.firstName.trim();
+  if (!ln && !fn) return p.id;
+  if (!fn) return ln;
+  const firstChar = [...fn][0] ?? "";
+  const initial = firstChar ? firstChar.toLocaleUpperCase("fr-FR") : "";
+  if (!ln) return fn;
+  return `${ln} ${initial}`;
+}
+
 export function playerById(players: Player[]): Map<PlayerId, Player> {
   return new Map(players.map((p) => [p.id, p]));
 }
@@ -88,8 +105,8 @@ export function formatTeamLabel(team: DoublesTeam, map: Map<PlayerId, Player>): 
   const [a, b] = team;
   const pa = map.get(a);
   const pb = map.get(b);
-  const na = pa ? playerFullName(pa) : a;
-  const nb = pb ? playerFullName(pb) : b;
+  const na = pa ? playerCompactName(pa) : a;
+  const nb = pb ? playerCompactName(pb) : b;
   return `${na}\u00a0·\u00a0${nb}`;
 }
 

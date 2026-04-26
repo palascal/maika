@@ -3,8 +3,8 @@ import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconActionButton, iconButtonBaseStyle } from "../components/IconActionButton";
 import { InfoTooltip } from "../components/InfoTooltip";
-import { AppLink } from "../navigation/AppLink";
 import { useAuth } from "../auth/AuthContext";
+import { playerFullName } from "../domain/format";
 import {
   DEFAULT_STARTING_SEASON_POINTS,
   sanitizeSeasonScoringConfig,
@@ -54,9 +54,12 @@ function configFieldLabel(key: (typeof MATCH_POINT_SCORING_RULE_KEYS)[number]): 
 
 export function AdminConfigPage() {
   const navigate = useNavigate();
-  const { canAccessConfig } = useAuth();
-  const { data, error, loading, savePlayersFile, saveScoringConfig } = useSeasonData();
+  const { canAccessConfig, isAdmin } = useAuth();
+  const { data, error, loading, saveMatchesFile, savePlayersFile, saveScoringConfig } = useSeasonData();
   const [config, setConfig] = useState<SeasonScoringConfig | null>(null);
+  const [newSeasonLabel, setNewSeasonLabel] = useState("");
+  const [newSeasonStepOpen, setNewSeasonStepOpen] = useState(false);
+  const [keptPlayerIds, setKeptPlayerIds] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -72,6 +75,10 @@ export function AdminConfigPage() {
       rules: { ...data.scoring.rules },
     });
   }, [data]);
+
+  useEffect(() => {
+    setNewSeasonLabel(data?.players.seasonLabel ?? "");
+  }, [data?.players.seasonLabel]);
 
   if (!canAccessConfig) return null;
 
@@ -121,6 +128,51 @@ export function AdminConfigPage() {
     }
   }
 
+  async function createNewSeasonNow() {
+    if (!data || !config || !isAdmin) return;
+    const seasonLabel = newSeasonLabel.trim();
+    if (!seasonLabel) {
+      setApplyError("Saisissez un nom de saison.");
+      return;
+    }
+    const selectedPlayers = data.players.players.filter((p) => keptPlayerIds.includes(p.id));
+    if (selectedPlayers.length === 0) {
+      setApplyError("Sélectionnez au moins un joueur à conserver.");
+      return;
+    }
+    const confirmText =
+      `Créer la nouvelle saison « ${seasonLabel} » ?\n\n` +
+      "Cette action va supprimer toutes les parties, conserver les joueurs sélectionnés, " +
+      "et remettre leurs points au score de départ.";
+    if (!window.confirm(confirmText)) return;
+
+    setApplyError(null);
+    setMessage(null);
+    setBusy(true);
+    try {
+      await saveMatchesFile({
+        ...data.matches,
+        matches: [],
+        updatedAt: today(),
+      });
+      await savePlayersFile({
+        ...data.players,
+        seasonLabel,
+        updatedAt: today(),
+        players: selectedPlayers.map((p) => ({
+          ...p,
+          seasonPoints: config.startingSeasonPoints,
+        })),
+      });
+      setNewSeasonStepOpen(false);
+      setMessage(`Nouvelle saison « ${seasonLabel} » créée : parties supprimées et points réinitialisés.`);
+    } catch (err: unknown) {
+      setApplyError(err instanceof Error ? err.message : "Création de saison impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data || !config) return <p>Chargement…</p>;
 
@@ -136,13 +188,88 @@ export function AdminConfigPage() {
     );
   };
 
+  function startNewSeasonStep() {
+    const seasonLabel = newSeasonLabel.trim();
+    if (!seasonLabel) {
+      setApplyError("Saisissez un nom de saison.");
+      return;
+    }
+    setApplyError(null);
+    setMessage(null);
+    setKeptPlayerIds(data.players.players.map((p) => p.id));
+    setNewSeasonStepOpen(true);
+  }
+
+  function toggleKeptPlayer(playerId: string) {
+    setKeptPlayerIds((current) => (current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId]));
+  }
+
+  const sortedPlayers = data.players.players
+    .slice()
+    .sort((a, b) => a.lastName.localeCompare(b.lastName, "fr") || a.firstName.localeCompare(b.firstName, "fr"));
+
+  if (isAdmin && newSeasonStepOpen) {
+    return (
+      <main>
+        <div style={{ ...configSectionStyle, marginBottom: "1rem" }}>
+          <h2 style={{ fontSize: "1.05rem", margin: "0 0 0.45rem" }}>Nouvelle saison</h2>
+          <p style={{ margin: 0, color: "var(--muted)" }}>
+            Sélectionnez les joueurs à conserver pour <strong>{newSeasonLabel.trim()}</strong>. Tous sont cochés par défaut.
+          </p>
+        </div>
+        <section style={configSectionStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: "0.7rem" }}>
+            <p style={{ margin: 0, color: "var(--muted)" }}>
+              {keptPlayerIds.length} / {sortedPlayers.length} joueur(s) conservé(s)
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" style={{ ...plainButtonStyle }} onClick={() => setKeptPlayerIds(sortedPlayers.map((p) => p.id))}>
+                Tout cocher
+              </button>
+              <button type="button" style={{ ...plainButtonStyle }} onClick={() => setKeptPlayerIds([])}>
+                Tout décocher
+              </button>
+            </div>
+          </div>
+          <div style={playersListStyle}>
+            {sortedPlayers.map((p) => (
+              <label key={p.id} style={playerRowStyle}>
+                <input type="checkbox" checked={keptPlayerIds.includes(p.id)} onChange={() => toggleKeptPlayer(p.id)} />
+                <span>{playerFullName(p)}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+        <div style={{ display: "flex", gap: 8, marginTop: "0.9rem", flexWrap: "wrap" }}>
+          <button type="button" style={plainButtonStyle} onClick={() => setNewSeasonStepOpen(false)} disabled={busy}>
+            Retour config
+          </button>
+          <IconActionButton
+            label="Créer la nouvelle saison"
+            icon={busy ? Loader2 : Save}
+            iconSize={19}
+            iconClassName={busy ? "animate-icon-spin" : undefined}
+            disabled={busy}
+            style={{
+              ...iconButtonBaseStyle,
+              ...buttonDanger,
+              padding: "0.5rem 0.85rem",
+              ...(busy ? { opacity: 0.85, cursor: "wait" } : {}),
+            }}
+            onClick={() => void createNewSeasonNow()}
+          />
+        </div>
+        {applyError ? (
+          <p role="alert" style={{ color: "var(--danger)", marginTop: "0.7rem" }}>
+            {applyError}
+          </p>
+        ) : null}
+      </main>
+    );
+  }
+
   return (
     <main>
-      <p style={{ marginTop: 0, marginBottom: "0.75rem" }}>
-        <AppLink to="/" style={backLinkStyle}>
-          ← Retour au Dashboard
-        </AppLink>
-      </p>
       <div style={headingRowStyle}>
         <h2 style={{ fontSize: "1.1rem", marginTop: 0, marginBottom: 0 }}>Configuration</h2>
         <InfoTooltip label="Aide configuration">
@@ -292,6 +419,42 @@ export function AdminConfigPage() {
               </div>
             </div>
           </section>
+          {isAdmin ? (
+            <section style={configSectionStyle}>
+              <h3 style={sectionTitleStyle}>Nouvelle saison</h3>
+              <div style={rowsWrapStyle}>
+                <label style={{ ...labelStackStyle }}>
+                  <span style={ruleLabelStyle}>Nom de saison (bandeau haut)</span>
+                  <input
+                    type="text"
+                    value={newSeasonLabel}
+                    onChange={(e) => setNewSeasonLabel(e.target.value)}
+                    style={inputStyle}
+                    placeholder="Ex. Maika 2027"
+                    aria-label="Nom de la nouvelle saison"
+                  />
+                </label>
+                <p style={seasonWarningStyle}>
+                  La création d’une nouvelle saison réinitialise les compteurs : toutes les parties seront supprimées,
+                  les joueurs conservés, et chaque joueur repartira avec les points de départ.
+                </p>
+                <div>
+                  <IconActionButton
+                    label="Choisir les joueurs à conserver"
+                    icon={Save}
+                    iconSize={19}
+                    disabled={busy}
+                    style={{
+                      ...iconButtonBaseStyle,
+                      ...buttonDanger,
+                      padding: "0.5rem 0.85rem",
+                    }}
+                    onClick={startNewSeasonStep}
+                  />
+                </div>
+              </div>
+            </section>
+          ) : null}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: "1rem", alignItems: "center" }}>
           <IconActionButton
@@ -339,7 +502,6 @@ export function AdminConfigPage() {
   );
 }
 
-const backLinkStyle: CSSProperties = { fontWeight: 600, textDecoration: "none" };
 const headingRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -400,6 +562,29 @@ const bonusPairRowStyle: CSSProperties = {
 };
 const bonusCellStyle: CSSProperties = { display: "grid", gap: "0.35rem", minWidth: 0 };
 const bonusFieldLabelStyle: CSSProperties = { fontSize: "0.8rem", color: "var(--muted)" };
+const labelStackStyle: CSSProperties = { display: "grid", gap: "0.35rem", minWidth: 0 };
+const seasonWarningStyle: CSSProperties = {
+  margin: "0.2rem 0 0",
+  color: "var(--muted)",
+  fontSize: "0.9rem",
+  lineHeight: 1.4,
+};
+const playersListStyle: CSSProperties = {
+  display: "grid",
+  gap: "0.35rem",
+  maxHeight: "20rem",
+  overflow: "auto",
+  padding: "0.5rem 0.6rem",
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  background: "color-mix(in srgb, var(--bg) 65%, var(--surface))",
+};
+const playerRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "0.18rem 0",
+};
 const inputStyle: CSSProperties = {
   width: "100%",
   padding: "0.5rem 0.65rem",
@@ -420,5 +605,20 @@ const buttonSecondary: CSSProperties = {
   border: "1px solid var(--border-strong)",
   background: "transparent",
   color: "var(--text)",
+  fontWeight: 600,
+};
+const buttonDanger: CSSProperties = {
+  border: "1px solid color-mix(in srgb, var(--danger) 45%, var(--border))",
+  background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
+  color: "var(--danger)",
+  fontWeight: 600,
+};
+const plainButtonStyle: CSSProperties = {
+  border: "1px solid var(--border-strong)",
+  background: "transparent",
+  color: "var(--text)",
+  borderRadius: 8,
+  padding: "0.45rem 0.7rem",
+  cursor: "pointer",
   fontWeight: 600,
 };

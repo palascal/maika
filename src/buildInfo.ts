@@ -1,2 +1,2 @@
 /** Numéro de build applicatif (incrémenté avant chaque push/version). */
-export const BUILD_NUMBER = 4;
+export const BUILD_NUMBER = 5;

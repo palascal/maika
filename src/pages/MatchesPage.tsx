@@ -1,5 +1,6 @@
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState, type CSSProperties } from "react";
+import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { IconActionButton, iconButtonBaseStyle } from "../components/IconActionButton";
 import {
@@ -10,18 +11,12 @@ import {
   playerById,
 } from "../domain/format";
 import { hasPeloteScore } from "../domain/matchScore";
-import { maikaFromSeasonPoints } from "../domain/maika";
-import { matchPointDeltasForPlayedMatch, mergeScoringRules, type MatchPointScoringRules } from "../domain/matchPointScoring";
-import type { Match, MatchStatus, Player, PlayerId } from "../domain/types";
+import { matchPointDeltasForPlayedMatch, mergeScoringRules } from "../domain/matchPointScoring";
+import { playerIsActive } from "../domain/playerActive";
+import type { Match, Player, PlayerId } from "../domain/types";
 import { openAppPathInNewWindow } from "../navigation/openAppPathInNewWindow";
 import { useSeasonData } from "../season/SeasonDataContext";
-
-function matchStatusLabel(s: MatchStatus): string {
-  if (s === "played") return "Jouée";
-  if (s === "scheduled") return "Prévue";
-  if (s === "cancelled") return "Annulée";
-  return s;
-}
+import { MatchForm } from "./MatchFormPage";
 
 const compositionStackStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 8 };
 const compositionRowBase: CSSProperties = {
@@ -93,12 +88,8 @@ function MatchWhenWhereCell({ m }: { m: Match }) {
 }
 
 type MatchDebug = {
-  levelGapEq1MinusEq2: number | null;
-  scoreGap: number | null;
-  winEq1: number | null;
-  loseEq1: number | null;
-  winEq2: number | null;
-  loseEq2: number | null;
+  deltaEq1: number | null;
+  deltaEq2: number | null;
 };
 
 function signedPoints(value: number | null): string {
@@ -108,8 +99,8 @@ function signedPoints(value: number | null): string {
 
 function MatchCompositionCell({ m, map, debug }: { m: Match; map: Map<PlayerId, Player>; debug?: MatchDebug }) {
   const scored = hasPeloteScore(m);
-  const pointsA = debug ? (debug.winEq1 ?? debug.loseEq1) : null;
-  const pointsB = debug ? (debug.winEq2 ?? debug.loseEq2) : null;
+  const pointsA = debug?.deltaEq1 ?? null;
+  const pointsB = debug?.deltaEq2 ?? null;
   const pointsAStyle = (pointsA ?? 0) >= 0 ? compositionPointsWinStyle : compositionPointsLoseStyle;
   const pointsBStyle = (pointsB ?? 0) >= 0 ? compositionPointsWinStyle : compositionPointsLoseStyle;
   return (
@@ -138,26 +129,16 @@ function MatchCompositionCell({ m, map, debug }: { m: Match; map: Map<PlayerId, 
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-function victoryPoints(opponentMinusWinner: number, rules: MatchPointScoringRules): number {
-  if (opponentMinusWinner >= 2) return rules.victoryOpponentMinusWinnerGte2;
-  if (opponentMinusWinner >= 1) return rules.victoryOpponentMinusWinnerGte1;
-  if (opponentMinusWinner === 0) return rules.victoryOpponentMinusWinnerEq0;
-  return rules.victoryOpponentMinusWinnerLt0;
-}
-
-function defeatPoints(winnerMinusLoser: number, rules: MatchPointScoringRules): number {
-  if (winnerMinusLoser > 0) return rules.defeatWinnerMinusLoserGt0;
-  if (winnerMinusLoser > -1) return rules.defeatWinnerMinusLoserEq0;
-  if (winnerMinusLoser >= -2) return rules.defeatWinnerMinusLoserEqMinus1;
-  return rules.defeatWinnerMinusLoserLteMinus2;
-}
-
 export function MatchesPage() {
   const { data, error, loading, saveMatchesFile } = useSeasonData();
   const { canManageLeague, role } = useAuth();
-  const showMatchStatusColumn = role === "orga" || role === "admin";
+  const [searchParams, setSearchParams] = useSearchParams();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [matchCreateOpen, setMatchCreateOpen] = useState(false);
+  const [matchCreateError, setMatchCreateError] = useState<string | null>(null);
+  const [savingMatch, setSavingMatch] = useState(false);
+  const [userPlayedHistoryExpanded, setUserPlayedHistoryExpanded] = useState(false);
 
   /** Toujours appelé (même en chargement) — ne pas placer après un return conditionnel. */
   const debugByMatchId = useMemo(() => {
@@ -171,30 +152,17 @@ export function MatchesPage() {
     for (const m of ordered) {
       if (m.status !== "played" || !hasPeloteScore(m) || m.scoreTeamA === m.scoreTeamB) {
         out.set(m.id, {
-          levelGapEq1MinusEq2: null,
-          scoreGap: null,
-          winEq1: null,
-          loseEq1: null,
-          winEq2: null,
-          loseEq2: null,
+          deltaEq1: null,
+          deltaEq2: null,
         });
         continue;
       }
-      const maikaEq1 = maikaFromSeasonPoints(points.get(m.teamA[0]) ?? 0) + maikaFromSeasonPoints(points.get(m.teamA[1]) ?? 0);
-      const maikaEq2 = maikaFromSeasonPoints(points.get(m.teamB[0]) ?? 0) + maikaFromSeasonPoints(points.get(m.teamB[1]) ?? 0);
-      const eq1Wins = (m.scoreTeamA ?? 0) > (m.scoreTeamB ?? 0);
-      const maikaWinner = eq1Wins ? maikaEq1 : maikaEq2;
-      const maikaLoser = eq1Wins ? maikaEq2 : maikaEq1;
-      const winPts = victoryPoints(maikaLoser - maikaWinner, rules);
-      const losePts = defeatPoints(maikaWinner - maikaLoser, rules);
       const deltas = matchPointDeltasForPlayedMatch(m, points, rules);
       out.set(m.id, {
-        levelGapEq1MinusEq2: maikaEq1 - maikaEq2,
-        scoreGap: Math.abs((m.scoreTeamA ?? 0) - (m.scoreTeamB ?? 0)),
-        winEq1: eq1Wins ? winPts : null,
-        loseEq1: eq1Wins ? null : losePts,
-        winEq2: eq1Wins ? null : winPts,
-        loseEq2: eq1Wins ? losePts : null,
+        // Le delta de la 1re personne de chaque équipe reflète le total réellement appliqué
+        // (barème victoire/défaite + bonus offensif/défensif).
+        deltaEq1: deltas.get(m.teamA[0]) ?? null,
+        deltaEq2: deltas.get(m.teamB[0]) ?? null,
       });
       for (const [id, d] of deltas) {
         if (!points.has(id)) continue;
@@ -204,7 +172,23 @@ export function MatchesPage() {
     return out;
   }, [data]);
 
-  const [userPlayedHistoryExpanded, setUserPlayedHistoryExpanded] = useState(false);
+  const playersForCreateModal = useMemo(() => {
+    const all = data?.players.players ?? [];
+    return all
+      .filter(playerIsActive)
+      .slice()
+      .sort((a, b) => a.lastName.localeCompare(b.lastName, "fr") || a.firstName.localeCompare(b.firstName, "fr"));
+  }, [data?.players.players]);
+
+  useEffect(() => {
+    if (!data) return;
+    if (searchParams.get("nouveau") !== "1") return;
+    setMatchCreateOpen(true);
+    setMatchCreateError(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete("nouveau");
+    setSearchParams(next, { replace: true });
+  }, [data, searchParams, setSearchParams]);
 
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data) return <p>Chargement…</p>;
@@ -241,6 +225,23 @@ export function MatchesPage() {
     }
   }
 
+  async function persistMatchCreate(nextMatches: Match[]) {
+    setMatchCreateError(null);
+    setSavingMatch(true);
+    try {
+      await saveMatchesFile({
+        ...data.matches,
+        matches: nextMatches,
+        updatedAt: today(),
+      });
+      setMatchCreateOpen(false);
+    } catch (e: unknown) {
+      setMatchCreateError(e instanceof Error ? e.message : "Enregistrement impossible.");
+    } finally {
+      setSavingMatch(false);
+    }
+  }
+
   return (
     <main>
       <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>Parties</h2>
@@ -252,11 +253,14 @@ export function MatchesPage() {
       {canManageLeague ? (
         <div style={{ display: "flex", gap: 8, marginBottom: "0.8rem", flexWrap: "wrap" }}>
           <IconActionButton
-            label="Ajouter une partie dans un nouvel onglet"
+            label="Ajouter une partie"
             icon={Plus}
             iconSize={20}
             style={{ ...iconButtonBaseStyle, ...buttonPrimary, border: "none" }}
-            onClick={() => openAppPathInNewWindow("/parties/ajout")}
+            onClick={() => {
+              setMatchCreateError(null);
+              setMatchCreateOpen(true);
+            }}
           />
         </div>
       ) : null}
@@ -308,7 +312,6 @@ export function MatchesPage() {
                   <td style={tdStyle}>
                     <MatchCompositionCell m={m} map={map} debug={debugByMatchId.get(m.id)} />
                   </td>
-                  {showMatchStatusColumn ? <td style={tdStyle}>{matchStatusLabel(m.status)}</td> : null}
                   {canManageLeague ? (
                     <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
@@ -342,6 +345,63 @@ export function MatchesPage() {
           </table>
         </div>
       )}
+      {matchCreateOpen && canManageLeague ? (
+        <div
+          style={matchModalOverlayStyle}
+          role="presentation"
+          onClick={() => {
+            if (!savingMatch) setMatchCreateOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="match-create-modal-title"
+            style={matchModalDialogStyle}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "start",
+                gap: 12,
+                marginBottom: "1rem",
+              }}
+            >
+              <h3 id="match-create-modal-title" style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>
+                Nouvelle partie
+              </h3>
+              <IconActionButton
+                label="Fermer"
+                icon={X}
+                iconSize={22}
+                disabled={savingMatch}
+                style={{ ...iconButtonBaseStyle, ...matchModalCloseBtnStyle }}
+                onClick={() => {
+                  if (!savingMatch) setMatchCreateOpen(false);
+                }}
+              />
+            </div>
+            {matchCreateError ? (
+              <p role="alert" style={{ margin: "0 0 0.75rem", color: "var(--danger)", fontSize: "0.92rem" }}>
+                {matchCreateError}
+              </p>
+            ) : null}
+            <MatchForm
+              players={playersForCreateModal}
+              matches={data.matches.matches}
+              seasonId={data.matches.seasonId}
+              saving={savingMatch}
+              onSubmit={persistMatchCreate}
+              onCancel={() => {
+                if (!savingMatch) setMatchCreateOpen(false);
+              }}
+              embeddedInModal
+            />
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -372,6 +432,39 @@ const buttonDanger: CSSProperties = {
   background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
   color: "var(--danger)",
   fontWeight: 600,
+};
+
+const matchModalOverlayStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(15, 23, 42, 0.4)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "1rem",
+  zIndex: 50,
+};
+
+const matchModalDialogStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: 720,
+  maxHeight: "90vh",
+  overflow: "auto",
+  background: "var(--surface)",
+  borderRadius: 16,
+  padding: "1.25rem",
+  boxShadow: "var(--shadow-lg)",
+  border: "1px solid var(--border)",
+};
+
+const matchModalCloseBtnStyle: CSSProperties = {
+  border: "none",
+  background: "transparent",
+  color: "var(--muted)",
+  cursor: "pointer",
+  padding: "0.15rem",
+  minWidth: "2.25rem",
+  minHeight: "2.25rem",
 };
 
 const userSectionHeadingStyle: CSSProperties = {

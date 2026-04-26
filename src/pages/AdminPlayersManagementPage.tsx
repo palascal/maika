@@ -4,6 +4,7 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import { IconActionButton, iconButtonBaseStyle } from "../components/IconActionButton";
 import { AppLink } from "../navigation/AppLink";
 import { useAuth } from "../auth/AuthContext";
+import { playerLastFirstName } from "../domain/format";
 import { playerIsActive } from "../domain/playerActive";
 import { collectPlayerIds, uniquePlayerId } from "../domain/playerId";
 import { posteLabel } from "../domain/ranking";
@@ -24,13 +25,6 @@ function isValidOptionalEmail(raw: string): boolean {
   const t = raw.trim();
   if (!t) return true;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
-}
-
-function emailPreview(raw?: string): string {
-  if (!raw) return "—";
-  const t = raw.trim();
-  if (t.length <= 10) return t;
-  return `${t.slice(0, 10)}…`;
 }
 
 export function AdminPlayersManagementPage() {
@@ -207,8 +201,8 @@ export function AdminPlayersManagementPage() {
               <th style={thStyle}>Joueur</th>
               <th style={thStyle}>Nb parties</th>
               <th style={thStyle}>Poste</th>
-              <th style={thStyle}>E-mail</th>
               <th style={{ ...thStyle, whiteSpace: "nowrap", minWidth: 118 }}>État</th>
+              <th style={{ ...thStyle, width: 1, whiteSpace: "nowrap", textAlign: "right" }} aria-label="Modifier" />
               {isAdmin ? <th style={thStyle}>Rôle</th> : null}
             </tr>
           </thead>
@@ -216,21 +210,20 @@ export function AdminPlayersManagementPage() {
             {sorted.map((p) => (
               <tr key={p.id} style={{ opacity: playerIsActive(p) ? 1 : 0.72 }}>
                 <td style={tdStyle}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <IconActionButton
-                      label={`Modifier ${p.firstName} ${p.lastName}`}
-                      icon={Pencil}
-                      iconSize={17}
-                      style={{ ...iconButtonBaseStyle, ...smallBtnStyle, padding: "0.35rem 0.5rem", flexShrink: 0 }}
-                      onClick={() => setModal({ mode: "edit", player: p })}
-                    />
-                    <div style={{ fontWeight: 600, minWidth: 0 }}>{p.firstName} {p.lastName}</div>
-                  </div>
+                  <div style={{ fontWeight: 600, minWidth: 0 }}>{playerLastFirstName(p)}</div>
                 </td>
                 <td style={tdStyle}>{playedCountByPlayerId.get(p.id) ?? 0}</td>
                 <td style={tdStyle}>{posteLabel(p.poste)}</td>
-                <td style={tdStyle} title={p.email ?? undefined}>{emailPreview(p.email)}</td>
                 <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{playerIsActive(p) ? <span style={badgeOk}>Actif</span> : <span style={badgeOff}>Désactivé</span>}</td>
+                <td style={{ ...tdStyle, textAlign: "right", whiteSpace: "nowrap", verticalAlign: "middle" }}>
+                  <IconActionButton
+                    label={`Modifier ${playerLastFirstName(p)}`}
+                    icon={Pencil}
+                    iconSize={17}
+                    style={{ ...iconButtonBaseStyle, ...smallBtnStyle, padding: "0.35rem 0.5rem" }}
+                    onClick={() => setModal({ mode: "edit", player: p })}
+                  />
+                </td>
                 {isAdmin ? <td style={tdStyle}>{appRoleLabel(p.authRole ?? "user")}</td> : null}
               </tr>
             ))}
