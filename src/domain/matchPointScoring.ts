@@ -200,6 +200,7 @@ export function matchScoringPayload(m: Match | undefined): string {
 /**
  * Recalcule les `seasonPoints` de tous les joueurs en rejouant les parties jouées dans l’ordre chronologique (date, puis id).
  * Chaque joueur démarre à `startingSeasonPoints` (ex. 10 → Maika 1) avant application des parties.
+ * Le poste (avant / arrière) ne participe pas au barème : changer de catégorie ne change pas le résultat du rejeu.
  */
 export function replaySeasonPointsFromMatches(
   playersFile: { players: Player[]; seasonId: string; seasonLabel: string; updatedAt: string },

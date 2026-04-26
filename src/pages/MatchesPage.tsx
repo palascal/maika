@@ -63,14 +63,31 @@ const matchWhenWhereLine2Style: CSSProperties = {
   lineHeight: 1.35,
 };
 
+function capitalizeFirst(value: string): string {
+  if (!value) return value;
+  return (value[0]?.toLocaleUpperCase("fr-FR") ?? "") + value.slice(1);
+}
+
+function formatMatchDateLabel(isoDay: string): string {
+  const raw = formatDateDayMonthFr(isoDay);
+  const parts = raw.split(" ");
+  if (parts.length < 3) return capitalizeFirst(raw);
+  const dayName = capitalizeFirst(parts[0] ?? "");
+  const month = capitalizeFirst(parts[parts.length - 1] ?? "");
+  return `${dayName} ${parts[1]} ${month}`;
+}
+
 function MatchWhenWhereCell({ m }: { m: Match }) {
-  const dateStr = formatDateDayMonthFr(m.date);
+  const dateStr = formatMatchDateLabel(m.date);
   const timeStr = m.time ? formatMatchHourDisplay(m.time) : "—";
   const venueStr = m.venue?.trim() ? m.venue.trim() : "—";
   return (
     <td style={tdStyle}>
       <div style={matchWhenWhereLine1Style}>{dateStr}</div>
-      <div style={matchWhenWhereLine2Style}>{`${timeStr}\u00a0·\u00a0${venueStr}`}</div>
+      <div style={matchWhenWhereLine2Style}>
+        <strong>{timeStr}</strong>
+        {`\u00a0·\u00a0${venueStr}`}
+      </div>
     </td>
   );
 }
@@ -137,7 +154,8 @@ function defeatPoints(winnerMinusLoser: number, rules: MatchPointScoringRules): 
 
 export function MatchesPage() {
   const { data, error, loading, saveMatchesFile } = useSeasonData();
-  const { canManageLeague, isAdmin } = useAuth();
+  const { canManageLeague, role } = useAuth();
+  const showMatchStatusColumn = role === "orga" || role === "admin";
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -186,11 +204,21 @@ export function MatchesPage() {
     return out;
   }, [data]);
 
+  const [userPlayedHistoryExpanded, setUserPlayedHistoryExpanded] = useState(false);
+
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data) return <p>Chargement…</p>;
 
   const map = playerById(data.players.players);
   const list = [...data.matches.matches].sort((a, b) => b.date.localeCompare(a.date));
+  const userScheduledMatches = [...data.matches.matches]
+    .filter((m) => m.status === "scheduled")
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const userPlayedMatchesDesc = [...data.matches.matches]
+    .filter((m) => m.status === "played")
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const userRecentPlayed = userPlayedMatchesDesc.slice(0, 3);
+  const userPlayedShown = userPlayedHistoryExpanded ? userPlayedMatchesDesc : userRecentPlayed;
 
   async function deleteMatch(m: Match) {
     const label = `${formatDateLongFr(m.date)} — ${formatTeamLabel(m.teamA, map)} / ${formatTeamLabel(m.teamB, map)}`;
@@ -232,68 +260,88 @@ export function MatchesPage() {
           />
         </div>
       ) : null}
-      <div className="table-scroll">
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>Date</th>
-              <th style={thStyle}>Composition</th>
-              <th style={thStyle}>Statut</th>
-              {isAdmin ? <th style={thStyle}>Écart niveau</th> : null}
-              {isAdmin ? <th style={thStyle}>Écart score</th> : null}
-              {isAdmin ? <th style={thStyle}>Pts victoire Eq1</th> : null}
-              {isAdmin ? <th style={thStyle}>Pts défaite Eq1</th> : null}
-              {isAdmin ? <th style={thStyle}>Pts victoire Eq2</th> : null}
-              {isAdmin ? <th style={thStyle}>Pts défaite Eq2</th> : null}
-              {canManageLeague ? <th style={thStyle}>Action</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((m) => (
-              <tr key={m.id}>
-                <MatchWhenWhereCell m={m} />
-                <td style={tdStyle}>
-                  <MatchCompositionCell m={m} map={map} debug={debugByMatchId.get(m.id)} />
-                </td>
-                <td style={tdStyle}>{matchStatusLabel(m.status)}</td>
-                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.levelGapEq1MinusEq2 ?? "—"}</td> : null}
-                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.scoreGap ?? "—"}</td> : null}
-                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.winEq1 ?? "—"}</td> : null}
-                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.loseEq1 ?? "—"}</td> : null}
-                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.winEq2 ?? "—"}</td> : null}
-                {isAdmin ? <td style={tdStyle}>{debugByMatchId.get(m.id)?.loseEq2 ?? "—"}</td> : null}
-                {canManageLeague ? (
-                  <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                      <IconActionButton
-                        label={`Modifier la partie du ${m.date} dans un nouvel onglet`}
-                        icon={Pencil}
-                        iconSize={18}
-                        style={{ ...iconButtonBaseStyle, ...buttonSecondary }}
-                        onClick={() => openAppPathInNewWindow(`/parties/${encodeURIComponent(m.id)}/modifier`)}
-                      />
-                      <button
-                        type="button"
-                        style={{ ...iconButtonBaseStyle, ...buttonDanger }}
-                        disabled={deletingId !== null}
-                        onClick={() => void deleteMatch(m)}
-                        aria-label={`Supprimer la partie du ${m.date}`}
-                        title="Supprimer la partie"
-                      >
-                        {deletingId === m.id ? (
-                          <Loader2 size={18} strokeWidth={2} className="animate-icon-spin" aria-hidden focusable={false} />
-                        ) : (
-                          <Trash2 size={18} strokeWidth={2} aria-hidden focusable={false} />
-                        )}
-                      </button>
-                    </div>
+      {role === "user" ? (
+        <>
+          <section style={{ marginBottom: "1.35rem" }}>
+            <h3 style={userSectionHeadingStyle}>Parties prévues</h3>
+            <UserMatchesTable
+              matches={userScheduledMatches}
+              map={map}
+              debugByMatchId={debugByMatchId}
+              emptyLabel="Aucune partie prévue."
+            />
+          </section>
+          <section>
+            <h3 style={userSectionHeadingStyle}>Dernières parties</h3>
+            <UserMatchesTable
+              matches={userPlayedShown}
+              map={map}
+              debugByMatchId={debugByMatchId}
+              emptyLabel="Aucune partie jouée pour le moment."
+            />
+            {userPlayedMatchesDesc.length > 3 ? (
+              <div style={{ marginTop: "0.75rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setUserPlayedHistoryExpanded((v) => !v)}
+                  style={{ ...iconButtonBaseStyle, ...buttonSecondary, padding: "0.45rem 0.9rem", fontWeight: 600 }}
+                  aria-expanded={userPlayedHistoryExpanded}
+                  aria-label={
+                    userPlayedHistoryExpanded
+                      ? "Réduire et n’afficher que les trois dernières parties"
+                      : "Afficher tout l’historique des parties jouées"
+                  }
+                >
+                  {userPlayedHistoryExpanded ? "Moins" : "Plus"}
+                </button>
+              </div>
+            ) : null}
+          </section>
+        </>
+      ) : (
+        <div className="table-scroll">
+          <table style={tableStyle}>
+            <tbody>
+              {list.map((m) => (
+                <tr key={m.id}>
+                  <MatchWhenWhereCell m={m} />
+                  <td style={tdStyle}>
+                    <MatchCompositionCell m={m} map={map} debug={debugByMatchId.get(m.id)} />
                   </td>
-                ) : null}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  {showMatchStatusColumn ? <td style={tdStyle}>{matchStatusLabel(m.status)}</td> : null}
+                  {canManageLeague ? (
+                    <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                        <IconActionButton
+                          label={`Modifier la partie du ${m.date} dans un nouvel onglet`}
+                          icon={Pencil}
+                          iconSize={18}
+                          style={{ ...iconButtonBaseStyle, ...buttonSecondary }}
+                          onClick={() => openAppPathInNewWindow(`/parties/${encodeURIComponent(m.id)}/modifier`)}
+                        />
+                        <button
+                          type="button"
+                          style={{ ...iconButtonBaseStyle, ...buttonDanger }}
+                          disabled={deletingId !== null}
+                          onClick={() => void deleteMatch(m)}
+                          aria-label={`Supprimer la partie du ${m.date}`}
+                          title="Supprimer la partie"
+                        >
+                          {deletingId === m.id ? (
+                            <Loader2 size={18} strokeWidth={2} className="animate-icon-spin" aria-hidden focusable={false} />
+                          ) : (
+                            <Trash2 size={18} strokeWidth={2} aria-hidden focusable={false} />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </main>
   );
 }
@@ -306,7 +354,6 @@ const tableStyle: CSSProperties = {
   borderRadius: 12,
   overflow: "hidden",
 };
-const thStyle: CSSProperties = { textAlign: "left", padding: "0.6rem", borderBottom: "1px solid var(--border)" };
 const tdStyle: CSSProperties = { padding: "0.6rem", borderBottom: "1px solid var(--border)" };
 const buttonPrimary: CSSProperties = {
   border: "none",
@@ -326,3 +373,42 @@ const buttonDanger: CSSProperties = {
   color: "var(--danger)",
   fontWeight: 600,
 };
+
+const userSectionHeadingStyle: CSSProperties = {
+  fontSize: "1rem",
+  fontWeight: 700,
+  margin: "0 0 0.5rem",
+  color: "var(--text)",
+};
+
+function UserMatchesTable({
+  matches,
+  map,
+  debugByMatchId,
+  emptyLabel,
+}: {
+  matches: Match[];
+  map: Map<PlayerId, Player>;
+  debugByMatchId: Map<string, MatchDebug>;
+  emptyLabel: string;
+}) {
+  if (matches.length === 0) {
+    return <p style={{ color: "var(--muted)", margin: "0.35rem 0 0", fontSize: "0.92rem" }}>{emptyLabel}</p>;
+  }
+  return (
+    <div className="table-scroll">
+      <table style={tableStyle}>
+        <tbody>
+          {matches.map((m) => (
+            <tr key={m.id}>
+              <MatchWhenWhereCell m={m} />
+              <td style={tdStyle}>
+                <MatchCompositionCell m={m} map={map} debug={debugByMatchId.get(m.id)} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

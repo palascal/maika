@@ -164,9 +164,6 @@ export function AdminPlayersManagementPage() {
             Edge est déployée.
           </p>
         </div>
-        <AppLink to="/joueurs" style={ghostLinkStyle}>
-          ← Liste & classements
-        </AppLink>
       </div>
 
       <div style={toolbarStyle}>
@@ -289,8 +286,11 @@ function PlayerModal({
   const [authRole, setAuthRole] = useState<PlayerAccessRole>(player?.authRole ?? "user");
   const [active, setActive] = useState(player ? playerIsActive(player) : true);
   const [localErr, setLocalErr] = useState<string | null>(null);
+  /** Si faux, à l’enregistrement on garde les points de la fiche à jour (`players`) — ex. changement de poste seul ou formulaire désynchronisé. */
+  const [seasonPointsEdited, setSeasonPointsEdited] = useState(false);
 
   useEffect(() => {
+    setSeasonPointsEdited(false);
     setLastName(player?.lastName ?? "");
     setFirstName(player?.firstName ?? "");
     setPoste(player?.poste ?? "avant");
@@ -300,6 +300,13 @@ function PlayerModal({
     setActive(player ? playerIsActive(player) : true);
     setLocalErr(null);
   }, [player, mode, startingSeasonPoints]);
+
+  useEffect(() => {
+    if (mode !== "edit" || !player || seasonPointsEdited) return;
+    const live = players.find((pl) => pl.id === player.id);
+    if (!live) return;
+    setSeasonPoints(String(live.seasonPoints));
+  }, [mode, player, players, seasonPointsEdited]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -314,9 +321,11 @@ function PlayerModal({
     if (!ln || !fn || !Number.isFinite(pts)) return;
     const em = normalizeEmail(email);
     if (mode === "edit" && player) {
+      const liveRow = players.find((pl) => pl.id === player.id);
+      const resolvedSeasonPoints = seasonPointsEdited ? Math.round(pts) : (liveRow?.seasonPoints ?? Math.round(pts));
       const next = players.map((p) => {
         if (p.id !== player.id) return p;
-        const updated: Player = { ...p, lastName: ln, firstName: fn, poste, seasonPoints: Math.round(pts), active };
+        const updated: Player = { ...p, lastName: ln, firstName: fn, poste, seasonPoints: resolvedSeasonPoints, active };
         if (em) updated.email = em;
         else delete (updated as { email?: string }).email;
         if (canAssignElevatedRoles) {
@@ -376,7 +385,17 @@ function PlayerModal({
             </label>
             <label style={labelStyle}>
               Points saison
-              <input type="number" value={seasonPoints} disabled={saving} onChange={(e) => setSeasonPoints(e.target.value)} required style={inputStyle} />
+              <input
+                type="number"
+                value={seasonPoints}
+                disabled={saving}
+                onChange={(e) => {
+                  setSeasonPointsEdited(true);
+                  setSeasonPoints(e.target.value);
+                }}
+                required
+                style={inputStyle}
+              />
             </label>
             <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>
               E-mail (optionnel)

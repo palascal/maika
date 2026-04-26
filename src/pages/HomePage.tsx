@@ -6,6 +6,11 @@ import { useSeasonData } from "../season/SeasonDataContext";
 
 type RankedRow = { player: Player; rank: number; playedCount: number };
 
+function playedMatchesLabel(count: number): string {
+  const word = count === 1 ? "partie" : "parties";
+  return `(${count} ${word})`;
+}
+
 function buildRankedRows(players: Player[], poste: Player["poste"], playedCountByPlayer: Map<string, number>): RankedRow[] {
   const ordered = players
     .filter((p) => p.poste === poste && playerIsActive(p))
@@ -119,7 +124,7 @@ function ZoneCard({
                 <span style={rowNameStyle}>{playerFullName(r.player)}</span>
               </div>
               <div style={rowRightStyle}>
-                <span style={rowMetaStyle}>{r.playedCount} p.</span>
+                <span style={rowMetaStyle}>{playedMatchesLabel(r.playedCount)}</span>
                 <span style={rowPointsStyle}>{r.player.seasonPoints} pts</span>
               </div>
             </div>
