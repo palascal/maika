@@ -1,6 +1,6 @@
 # Spécifications — application « Maika » (classement pelote / doubles)
 
-Document destiné à un humain ou à une IA pour reprendre le projet sans parcourir tout le code. Dernière rédaction alignée sur le code du dossier `maika/`.
+Document **domaine** (types, points, fichiers JSON, algorithme de sauvegarde). Pour une **vue d’architecture** et une reprise projet (routes, auth, Supabase, UI), utiliser en priorité [**TECH_SPEC.md**](./TECH_SPEC.md). Pour les **utilisateurs**, voir [**GUIDE_UTILISATEUR.md**](./GUIDE_UTILISATEUR.md).
 
 ---
 
@@ -171,29 +171,36 @@ Ensuite : `saveMatchesToDisk` avec les matches annotés ; si `touched`, `savePla
 
 - Fichier : `src/auth/authCredentials.ts`
 - Login : `tryLogin(username, password)` — comparaisons insensibles à la casse sur le nom d’utilisateur.
-- Comptes de démo : **`admin` / `admin`**, **`user` / `user`**
+- Comptes de démo : **`admin` / `admin`**, **`orga` / `orga`**, **`user` / `user`**
 - Session stockée : `localStorage` (`readStoredSession` / `writeStoredSession`).
 
-**Mode Supabase** : `AuthContext` utilise `signInWithPassword` (e-mail + mot de passe) et `mapSupabaseSession.ts` : **admin** si `app_metadata.role === "admin"` (défini dans le dashboard Supabase), sinon **user**.
+**Mode Supabase** : `AuthContext` utilise `signInWithPassword` (e-mail + mot de passe) et `mapSupabaseSession.ts` : le rôle applicatif est `normalizeAppRole(user.app_metadata.role)` → **`admin`**, **`orga`** ou **`user`** (défaut si absent).
 
-Dans les deux modes : **Admin** → page Config et écritures ; **User** → consultation (voir `ProtectedShell`).
+**Capacités UI** (voir `src/lib/accessRoles.ts`) :
 
-**Sécurité** : en mode JSON, les comptes sont factices. En mode Supabase, la sécurité des données repose sur les **RLS** Supabase ; l’UI reflète le rôle mais ne suffit pas seule.
+- **`user`** : consultation (classement, parties selon écran).
+- **`orga`** + **`admin`** : `canManageLeague` — joueurs, parties, administration des joueurs.
+- **`admin`** seul : `canAccessConfig` — page **Config** (barème, rejeu, nouvelle saison) ; `canAssignElevatedRoles` — attribution des rôles sur les fiches joueurs.
+
+**Sécurité** : en mode JSON, les comptes sont factices. En mode Supabase, la sécurité des données repose sur les **RLS** Supabase ; l’UI reflète le rôle mais ne suffit pas seule. Les écritures **orga** sur `players` / `matches` sont prévues par la migration **`006_allow_orga_writes.sql`** (voir **TECH_SPEC.md** §8).
 
 ---
 
 ## 8. Routes principales
 
-Définies dans `src/App.tsx` (toutes derrière `RequireAuth` sauf `/connexion`) :
+Définies dans `src/App.tsx` (toutes derrière `RequireAuth` sauf `/connexion`). Détail à jour : **TECH_SPEC.md** §6.
 
 | Chemin | Page |
 |--------|------|
 | `/` | Dashboard (`HomePage`) |
-| `/parties` | Liste des parties + actions |
-| `/parties/ajout`, `/parties/:matchId/modifier` | Formulaire partie (`MatchFormPage`) — souvent ouvert dans un nouvel onglet depuis la liste |
-| `/joueurs` | Liste joueurs |
-| `/joueurs/ajout`, `/joueurs/:playerId/modifier` | Formulaire joueur |
-| `/config` | Configuration barème + rejeu (`AdminConfigPage`) — réservé admin |
+| `/parties` | Liste des parties ; **création** via modale ; `?nouveau=1` ouvre la modale |
+| `/parties/ajout` | Redirection vers `/parties?nouveau=1` |
+| `/parties/:matchId/modifier` | Édition partie (`MatchFormPage`) — souvent nouvel onglet |
+| `/joueurs` | Liste joueurs (`PlayersPage`) |
+| `/joueurs/ajout`, `/joueurs/:playerId/modifier` | Redirection vers `/admin/joueurs?…` |
+| `/admin/joueurs` | Administration des joueurs (`AdminPlayersManagementPage`) |
+| `/config` | Configuration barème + rejeu (`AdminConfigPage`) — réservé **admin** |
+| `/reglement` | Redirection accueil ; l’aide barème est une **modale** (icône ? dans le header) |
 
 ---
 
@@ -262,8 +269,8 @@ En `npm run preview`, les chemins pointent vers `dist/data/…`. Clients : `save
 Si `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` sont définies au build :
 
 - **Données** : tables `seasons`, `players`, `matches`, `scoring_config` (voir `supabase/migrations/001_maika_schema.sql`). Le code d’accès est dans `src/data/supabaseSeasonRepository.ts`, façade `src/data/seasonRepository.ts`.
-- **Auth** : Supabase Auth (e-mail / mot de passe). Rôle admin : `app_metadata.role === "admin"` sur l’utilisateur (dashboard Supabase). Sinon rôle applicatif **user** (UI + RLS lecture seule côté écritures).
-- **RLS** : lecture publique (anon) ; écritures réservées aux JWT admin.
+- **Auth** : Supabase Auth (e-mail / mot de passe). Rôles : `app_metadata.role` ∈ `admin` \| `orga` \| `user` (défaut **user** si absent), aligné sur `normalizeAppRole` côté client.
+- **RLS** : lecture publique (anon) selon politiques du dépôt ; écritures **`players`** / **`matches`** (et update **`seasons`**) pour JWT **`admin`** et **`orga`** après migration **`006_allow_orga_writes.sql`** ; création / suppression de **saisons** et politiques **scoring_config** restent selon les migrations en place (souvent **admin** pour la config barème).
 - **Saison** : `VITE_SUPABASE_SEASON_ID` (défaut `2026`) = clé primaire dans `seasons`.
 - **Instructions pas à pas** : `docs/INSTRUCTIONS.md`.
 

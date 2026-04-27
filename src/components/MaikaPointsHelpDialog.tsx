@@ -5,7 +5,17 @@ import { DEFAULT_MATCH_POINT_SCORING_RULES } from "../domain/matchPointScoring";
 
 const r = DEFAULT_MATCH_POINT_SCORING_RULES;
 
-export function MaikaPointsHelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function MaikaPointsHelpDialog({
+  open,
+  onClose,
+  seasonLabel,
+  buildNumber,
+}: {
+  open: boolean;
+  onClose: () => void;
+  seasonLabel: string;
+  buildNumber: number;
+}) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -50,7 +60,7 @@ export function MaikaPointsHelpDialog({ open, onClose }: { open: boolean; onClos
           </button>
         </div>
         <div style={scrollBodyStyle}>
-          <MaikaPointsHelpContent />
+          <MaikaPointsHelpContent seasonLabel={seasonLabel} buildNumber={buildNumber} />
         </div>
       </div>
     </div>,
@@ -58,9 +68,12 @@ export function MaikaPointsHelpDialog({ open, onClose }: { open: boolean; onClos
   );
 }
 
-function MaikaPointsHelpContent() {
+function MaikaPointsHelpContent({ seasonLabel, buildNumber }: { seasonLabel: string; buildNumber: number }) {
   return (
     <article style={articleStyle}>
+      <p style={metaIntroStyle}>
+        <strong>Saison :</strong> {seasonLabel} {"·"} <strong>Build :</strong> {buildNumber}
+      </p>
       <section style={sectionStyle}>
         <h3 style={h3Style}>1. Attribution des points</h3>
         <h4 style={h4Style}>Points de victoire</h4>
@@ -197,6 +210,7 @@ const articleStyle: CSSProperties = {
   border: "none",
   boxShadow: "none",
 };
+const metaIntroStyle: CSSProperties = { margin: "0 0 0.75rem", color: "var(--muted)", fontSize: "0.86rem" };
 const sectionStyle: CSSProperties = { marginBottom: "1.15rem" };
 const h3Style: CSSProperties = { fontSize: "1rem", margin: "0 0 0.5rem", color: "var(--text)" };
 const h4Style: CSSProperties = { fontSize: "0.92rem", margin: "1rem 0 0.4rem", color: "var(--muted)" };

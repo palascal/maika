@@ -2,6 +2,9 @@
 
 Ce fichier regroupe **les étapes concrètes** pour utiliser l’application avec une base **Supabase** (édition en ligne depuis le site, y compris hébergement statique type GitHub Pages).
 
+- **Guide utilisateur** (rôles, écrans, règles métiers) : [`GUIDE_UTILISATEUR.md`](./GUIDE_UTILISATEUR.md).
+- **Spécification technique** (architecture, reprise code / IA) : [`TECH_SPEC.md`](./TECH_SPEC.md).
+
 Si vous ne configurez **pas** Supabase, vous n’avez pas à suivre ce guide : gardez les fichiers JSON dans `public/data/`, lancez `npm run dev` pour sauvegarder, et utilisez les comptes démo `admin` / `admin`, `orga` / `orga` ou `user` / `user` sur l’écran de connexion.
 
 ---

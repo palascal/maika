@@ -81,10 +81,7 @@ export function LoginPage() {
       <h1 style={{ fontSize: "1.35rem", marginTop: 0, textAlign: "center" }}>Connexion</h1>
       <p style={{ color: "var(--muted)", fontSize: "0.95rem", marginBottom: "1.25rem" }}>
         {isSupabaseConfigured() ? (
-          <>
-            Compte <strong>Supabase</strong> : e-mail / mot de passe. Les droits d’administration dépendent de{" "}
-            <code>app_metadata.role</code> dans le tableau de bord.
-          </>
+          <>Compte Supabase : e-mail / mot de passe.</>
         ) : (
           <>
             Comptes démo : <strong>admin</strong>/<strong>admin</strong> (administration),{" "}

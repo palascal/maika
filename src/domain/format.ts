@@ -94,7 +94,7 @@ export function playerCompactName(p: Player): string {
   const firstChar = [...fn][0] ?? "";
   const initial = firstChar ? firstChar.toLocaleUpperCase("fr-FR") : "";
   if (!ln) return fn;
-  return `${ln} ${initial}`;
+  return `${ln}\u00a0${initial}`;
 }
 
 export function playerById(players: Player[]): Map<PlayerId, Player> {

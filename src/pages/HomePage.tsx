@@ -1,5 +1,5 @@
 import { Award, Medal } from "lucide-react";
-import { useMemo, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { playerCompactName } from "../domain/format";
 import { playerIsActive } from "../domain/playerActive";
@@ -38,6 +38,7 @@ function rankIcon(rank: number) {
 export function HomePage() {
   const { data, error, loading } = useSeasonData();
   const { role, session } = useAuth();
+  const [selectedPoste, setSelectedPoste] = useState<Player["poste"]>("avant");
 
   const playedCountByPlayer = useMemo(() => {
     const out = new Map<string, number>();
@@ -94,6 +95,8 @@ export function HomePage() {
   const barrageAr = arriereRows.slice(2, 6);
   const otherAr = arriereRows.slice(6);
 
+  const selectedRows = selectedPoste === "avant" ? { demi: demiA, barrage: barrageA, other: otherA } : { demi: demiAr, barrage: barrageAr, other: otherAr };
+
   return (
     <main>
       {role === "user" && linkedPlayer ? (
@@ -129,27 +132,28 @@ export function HomePage() {
       ) : null}
 
       <section style={{ marginBottom: "1.5rem" }}>
-        <h2 style={{ fontSize: "1.1rem", marginTop: 0, marginBottom: "0.65rem" }}>Classement global</h2>
-        <p style={{ margin: "0 0 0.85rem", color: "var(--muted)", fontSize: "0.88rem" }}>
-          Les 2 premiers sont qualifiés en 1/2 finales. Les 4 suivants sont barragistes.
-        </p>
-        <div style={twoColumnsStyle}>
-          <div style={columnWrapStyle}>
-            <h3 style={columnTitleStyle}>Avants</h3>
-            <div style={zonesWrapStyle}>
-              <ZoneCard label="1/2 finalistes" tone="top2" rows={demiA} />
-              <ZoneCard label="Barragistes" tone="barrage" rows={barrageA} />
-              <ZoneCard label="Fond du classement" tone="other" rows={otherA} />
-            </div>
-          </div>
-          <div style={columnWrapStyle}>
-            <h3 style={columnTitleStyle}>Arrières</h3>
-            <div style={zonesWrapStyle}>
-              <ZoneCard label="1/2 finalistes" tone="top2" rows={demiAr} />
-              <ZoneCard label="Barragistes" tone="barrage" rows={barrageAr} />
-              <ZoneCard label="Fond du classement" tone="other" rows={otherAr} />
-            </div>
-          </div>
+        <div style={posteTabsWrapStyle}>
+          <button
+            type="button"
+            onClick={() => setSelectedPoste("avant")}
+            aria-pressed={selectedPoste === "avant"}
+            style={{ ...posteTabStyle, ...(selectedPoste === "avant" ? posteTabActiveStyle : null) }}
+          >
+            Avants
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedPoste("arriere")}
+            aria-pressed={selectedPoste === "arriere"}
+            style={{ ...posteTabStyle, ...(selectedPoste === "arriere" ? posteTabActiveStyle : null) }}
+          >
+            Arrières
+          </button>
+        </div>
+        <div style={zonesWrapStyle}>
+          <ZoneCard label="1/2 finalistes" tone="top2" rows={selectedRows.demi} />
+          <ZoneCard label="Barragistes" tone="barrage" rows={selectedRows.barrage} />
+          <ZoneCard label="Fond du classement" tone="other" rows={selectedRows.other} />
         </div>
       </section>
     </main>
@@ -210,20 +214,27 @@ function toneCardStyle(tone: "top2" | "barrage" | "other"): CSSProperties {
   };
 }
 
-const twoColumnsStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 17rem), 1fr))",
-  gap: "1rem",
-  alignItems: "start",
+const posteTabsWrapStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+  marginBottom: "0.75rem",
 };
 
-const columnWrapStyle: CSSProperties = { minWidth: 0 };
-
-const columnTitleStyle: CSSProperties = {
-  margin: "0 0 0.5rem",
-  fontSize: "0.95rem",
-  fontWeight: 700,
+const posteTabStyle: CSSProperties = {
+  border: "1px solid var(--border-strong)",
+  background: "transparent",
   color: "var(--text)",
+  borderRadius: 10,
+  padding: "0.45rem 0.85rem",
+  fontWeight: 600,
+  cursor: "pointer",
+  minHeight: "2.5rem",
+};
+
+const posteTabActiveStyle: CSSProperties = {
+  background: "var(--nav-active-bg)",
+  color: "var(--nav-active-text)",
 };
 
 const zonesWrapStyle: CSSProperties = {

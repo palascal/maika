@@ -1,5 +1,5 @@
 import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { IconActionButton, iconButtonBaseStyle } from "../components/IconActionButton";
@@ -21,7 +21,7 @@ import { MatchForm } from "./MatchFormPage";
 const compositionStackStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 8 };
 const compositionRowBase: CSSProperties = {
   display: "flex",
-  flexWrap: "wrap",
+  flexWrap: "nowrap",
   alignItems: "baseline",
   justifyContent: "space-between",
   gap: "0.35rem 0.75rem",
@@ -34,7 +34,13 @@ const compositionRowB: CSSProperties = {
   ...compositionRowBase,
   borderLeftColor: "#64748b",
 };
-const compositionNamesStyle: CSSProperties = { flex: "1 1 8rem", minWidth: 0 };
+const compositionNamesStyle: CSSProperties = {
+  flex: "1 1 8rem",
+  minWidth: 0,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
 const compositionScoreStyle: CSSProperties = { fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 };
 const compositionScoreWrapStyle: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8 };
 const compositionPointsWinStyle: CSSProperties = {
@@ -127,6 +133,35 @@ function MatchCompositionCell({ m, map, debug }: { m: Match; map: Map<PlayerId, 
   );
 }
 
+function MatchMobileCard({
+  m,
+  map,
+  debug,
+  actions,
+}: {
+  m: Match;
+  map: Map<PlayerId, Player>;
+  debug?: MatchDebug;
+  actions?: ReactNode;
+}) {
+  const dateStr = formatMatchDateLabel(m.date);
+  const timeStr = m.time ? formatMatchHourDisplay(m.time) : "—";
+  const venueStr = m.venue?.trim() ? m.venue.trim() : "—";
+  return (
+    <article style={mobileCardStyle}>
+      <div style={matchWhenWhereLine1Style}>{dateStr}</div>
+      <div style={matchWhenWhereLine2Style}>
+        <strong>{timeStr}</strong>
+        {`\u00a0·\u00a0${venueStr}`}
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <MatchCompositionCell m={m} map={map} debug={debug} />
+      </div>
+      {actions ? <div style={mobileActionsStyle}>{actions}</div> : null}
+    </article>
+  );
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function MatchesPage() {
@@ -139,6 +174,9 @@ export function MatchesPage() {
   const [matchCreateError, setMatchCreateError] = useState<string | null>(null);
   const [savingMatch, setSavingMatch] = useState(false);
   const [userPlayedHistoryExpanded, setUserPlayedHistoryExpanded] = useState(false);
+  const [mobileView, setMobileView] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 760px)").matches : false,
+  );
 
   /** Toujours appelé (même en chargement) — ne pas placer après un return conditionnel. */
   const debugByMatchId = useMemo(() => {
@@ -189,6 +227,15 @@ export function MatchesPage() {
     next.delete("nouveau");
     setSearchParams(next, { replace: true });
   }, [data, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 760px)");
+    const onChange = () => setMobileView(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data) return <p>Chargement…</p>;
@@ -273,6 +320,7 @@ export function MatchesPage() {
               map={map}
               debugByMatchId={debugByMatchId}
               emptyLabel="Aucune partie prévue."
+              mobileView={mobileView}
             />
           </section>
           <section>
@@ -282,6 +330,7 @@ export function MatchesPage() {
               map={map}
               debugByMatchId={debugByMatchId}
               emptyLabel="Aucune partie jouée pour le moment."
+              mobileView={mobileView}
             />
             {userPlayedMatchesDesc.length > 3 ? (
               <div style={{ marginTop: "0.75rem" }}>
@@ -302,6 +351,44 @@ export function MatchesPage() {
             ) : null}
           </section>
         </>
+      ) : mobileView ? (
+        <div style={mobileListStyle}>
+          {list.map((m) => (
+            <MatchMobileCard
+              key={m.id}
+              m={m}
+              map={map}
+              debug={debugByMatchId.get(m.id)}
+              actions={
+                canManageLeague ? (
+                  <>
+                    <IconActionButton
+                      label={`Modifier la partie du ${m.date} dans un nouvel onglet`}
+                      icon={Pencil}
+                      iconSize={18}
+                      style={{ ...iconButtonBaseStyle, ...buttonSecondary }}
+                      onClick={() => openAppPathInNewWindow(`/parties/${encodeURIComponent(m.id)}/modifier`)}
+                    />
+                    <button
+                      type="button"
+                      style={{ ...iconButtonBaseStyle, ...buttonDanger }}
+                      disabled={deletingId !== null}
+                      onClick={() => void deleteMatch(m)}
+                      aria-label={`Supprimer la partie du ${m.date}`}
+                      title="Supprimer la partie"
+                    >
+                      {deletingId === m.id ? (
+                        <Loader2 size={18} strokeWidth={2} className="animate-icon-spin" aria-hidden focusable={false} />
+                      ) : (
+                        <Trash2 size={18} strokeWidth={2} aria-hidden focusable={false} />
+                      )}
+                    </button>
+                  </>
+                ) : null
+              }
+            />
+          ))}
+        </div>
       ) : (
         <div className="table-scroll">
           <table style={tableStyle}>
@@ -433,6 +520,21 @@ const buttonDanger: CSSProperties = {
   color: "var(--danger)",
   fontWeight: 600,
 };
+const mobileListStyle: CSSProperties = { display: "grid", gap: 10 };
+const mobileCardStyle: CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "0.65rem 0.7rem",
+  background: "var(--surface)",
+  boxShadow: "var(--shadow-sm)",
+};
+const mobileActionsStyle: CSSProperties = {
+  marginTop: 8,
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 8,
+  flexWrap: "wrap",
+};
 
 const matchModalOverlayStyle: CSSProperties = {
   position: "fixed",
@@ -479,14 +581,25 @@ function UserMatchesTable({
   map,
   debugByMatchId,
   emptyLabel,
+  mobileView,
 }: {
   matches: Match[];
   map: Map<PlayerId, Player>;
   debugByMatchId: Map<string, MatchDebug>;
   emptyLabel: string;
+  mobileView: boolean;
 }) {
   if (matches.length === 0) {
     return <p style={{ color: "var(--muted)", margin: "0.35rem 0 0", fontSize: "0.92rem" }}>{emptyLabel}</p>;
+  }
+  if (mobileView) {
+    return (
+      <div style={mobileListStyle}>
+        {matches.map((m) => (
+          <MatchMobileCard key={m.id} m={m} map={map} debug={debugByMatchId.get(m.id)} />
+        ))}
+      </div>
+    );
   }
   return (
     <div className="table-scroll">

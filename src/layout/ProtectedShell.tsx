@@ -2,7 +2,6 @@ import { CircleHelp, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { MaikaPointsHelpDialog } from "../components/MaikaPointsHelpDialog";
-import { SiteLogo } from "../components/SiteLogo";
 import { BUILD_NUMBER } from "../buildInfo";
 import { useAuth } from "../auth/AuthContext";
 import { ShellNavLink } from "../navigation/AppLink";
@@ -80,42 +79,15 @@ function ProtectedShellContent() {
 
   return (
     <>
-      <MaikaPointsHelpDialog open={maikaHelpOpen} onClose={() => setMaikaHelpOpen(false)} />
+      <MaikaPointsHelpDialog
+        open={maikaHelpOpen}
+        onClose={() => setMaikaHelpOpen(false)}
+        seasonLabel={seasonLabel}
+        buildNumber={BUILD_NUMBER}
+      />
       <header className="app-header">
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <SiteLogo size={36} style={{ marginTop: 2, opacity: 0.92 }} decorative />
-            <div>
-              <h1
-                style={{
-                  fontSize: "1.35rem",
-                  margin: "0 0 0.25rem",
-                  color: "var(--text)",
-                  fontWeight: 700,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                Maïka {seasonLabel}
-                <span
-                  style={{
-                    fontSize: "0.62rem",
-                    lineHeight: 1,
-                    color: "var(--muted)",
-                    opacity: 0.95,
-                    letterSpacing: "0.02em",
-                    fontWeight: 600,
-                    fontFamily: "Inter, system-ui, sans-serif",
-                    textTransform: "none",
-                  }}
-                >
-                  build {BUILD_NUMBER}
-                </span>
-              </h1>
-              <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.95rem" }}>{session?.username}</p>
-            </div>
-          </div>
+          <p style={{ margin: "0.35rem 0 0", color: "var(--muted)", fontSize: "0.95rem", fontWeight: 600 }}>{session?.username}</p>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <button
               type="button"
