@@ -32,6 +32,9 @@ export function AdminPlayersManagementPage() {
   const { data, error, loading, savePlayersFile } = useSeasonData();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
+  const [mobileView, setMobileView] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 760px)").matches : false,
+  );
   const [statusFilter, setStatusFilter] = useState<"tous" | "actifs" | "inactifs">("tous");
   const [sortMode, setSortMode] = useState<"alpha" | "poste" | "nbParties">("alpha");
   const [modal, setModal] = useState<null | { mode: "create" } | { mode: "edit"; player: Player }>(null);
@@ -66,6 +69,15 @@ export function AdminPlayersManagementPage() {
       );
     }
   }, [data, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 760px)");
+    const onChange = () => setMobileView(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const persist = useCallback(
     async (nextPlayers: Player[]) => {
@@ -149,15 +161,7 @@ export function AdminPlayersManagementPage() {
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: "1rem" }}>
-        <div>
-          <h2 style={{ fontSize: "1.2rem", margin: "0 0 0.35rem" }}>Administration des joueurs</h2>
-          <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.92rem", maxWidth: 640 }}>
-            Création, édition, e-mail de contact et activation. Les parties existantes ne sont pas modifiées lorsqu’un joueur
-            est désactivé. Le bouton « Ajouter » de la page Joueurs ouvre cette même vue. En mode Supabase, un e-mail
-            renseigné est aligné sur Authentication (invitation ou changement d’adresse) après enregistrement, si la fonction
-            Edge est déployée.
-          </p>
-        </div>
+        <div />
       </div>
 
       <div style={toolbarStyle}>
@@ -179,13 +183,15 @@ export function AdminPlayersManagementPage() {
           <option value="poste">Tri : poste</option>
           <option value="nbParties">Tri : nb parties jouées</option>
         </select>
-        <IconActionButton
-          label="Créer un nouveau joueur"
-          icon={Plus}
-          iconSize={20}
-          style={{ ...iconButtonBaseStyle, ...accentBtnStyle, border: "none", padding: "0.5rem 0.75rem" }}
-          onClick={() => setModal({ mode: "create" })}
-        />
+        {!mobileView ? (
+          <IconActionButton
+            label="Créer un nouveau joueur"
+            icon={Plus}
+            iconSize={20}
+            style={{ ...iconButtonBaseStyle, ...accentBtnStyle, border: "none", padding: "0.5rem 0.75rem" }}
+            onClick={() => setModal({ mode: "create" })}
+          />
+        ) : null}
       </div>
 
       {saveError ? (
@@ -247,6 +253,17 @@ export function AdminPlayersManagementPage() {
             await persist(nextList);
           }}
         />
+      ) : null}
+      {mobileView ? (
+        <div style={mobileFloatingActionWrapStyle}>
+          <IconActionButton
+            label="Créer un nouveau joueur"
+            icon={Plus}
+            iconSize={20}
+            style={{ ...iconButtonBaseStyle, ...accentBtnStyle, border: "none", padding: "0.5rem 0.9rem", minHeight: "2.65rem" }}
+            onClick={() => setModal({ mode: "create" })}
+          />
+        </div>
       ) : null}
     </main>
   );
@@ -548,13 +565,23 @@ const smallBtnStyle: CSSProperties = {
 };
 
 const accentBtnStyle: CSSProperties = {
-  borderRadius: 10,
-  border: "none",
-  background: "var(--accent)",
-  color: "var(--on-accent)",
-  fontWeight: 700,
+  borderRadius: 999,
+  border: "1px solid color-mix(in srgb, var(--accent) 22%, var(--border))",
+  background: "var(--surface)",
+  color: "var(--nav-active-text)",
+  boxShadow: "var(--shadow-sm)",
+  fontWeight: 600,
   cursor: "pointer",
   fontSize: "0.95rem",
+};
+const mobileFloatingActionWrapStyle: CSSProperties = {
+  position: "fixed",
+  left: "0.75rem",
+  right: "0.75rem",
+  bottom: "calc(5.2rem + env(safe-area-inset-bottom))",
+  zIndex: 56,
+  display: "flex",
+  justifyContent: "center",
 };
 
 const overlayStyle: CSSProperties = {

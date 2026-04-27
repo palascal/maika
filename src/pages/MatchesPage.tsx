@@ -1,8 +1,10 @@
-import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { CircleHelp, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { IconActionButton, iconButtonBaseStyle } from "../components/IconActionButton";
+import { MaikaPointsHelpDialog } from "../components/MaikaPointsHelpDialog";
+import { BUILD_NUMBER } from "../buildInfo";
 import {
   formatDateDayMonthFr,
   formatDateLongFr,
@@ -137,27 +139,45 @@ function MatchMobileCard({
   m,
   map,
   debug,
-  actions,
+  onClick,
+  clickable,
 }: {
   m: Match;
   map: Map<PlayerId, Player>;
   debug?: MatchDebug;
-  actions?: ReactNode;
+  onClick?: () => void;
+  clickable?: boolean;
 }) {
   const dateStr = formatMatchDateLabel(m.date);
   const timeStr = m.time ? formatMatchHourDisplay(m.time) : "—";
   const venueStr = m.venue?.trim() ? m.venue.trim() : "—";
   return (
-    <article style={mobileCardStyle}>
-      <div style={matchWhenWhereLine1Style}>{dateStr}</div>
-      <div style={matchWhenWhereLine2Style}>
+    <article
+      style={{ ...mobileCardStyle, ...(clickable ? mobileCardClickableStyle : null) }}
+      onClick={onClick}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={
+        clickable && onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      aria-label={clickable ? `Modifier la partie du ${m.date}` : undefined}
+    >
+      <div style={mobileMetaLineStyle}>
+        <span style={mobileDateInlineStyle}>{dateStr}</span>
+        {`\u00a0·\u00a0`}
         <strong>{timeStr}</strong>
         {`\u00a0·\u00a0${venueStr}`}
       </div>
       <div style={{ marginTop: 8 }}>
         <MatchCompositionCell m={m} map={map} debug={debug} />
       </div>
-      {actions ? <div style={mobileActionsStyle}>{actions}</div> : null}
     </article>
   );
 }
@@ -174,6 +194,8 @@ export function MatchesPage() {
   const [matchCreateError, setMatchCreateError] = useState<string | null>(null);
   const [savingMatch, setSavingMatch] = useState(false);
   const [userPlayedHistoryExpanded, setUserPlayedHistoryExpanded] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [mobileUserSection, setMobileUserSection] = useState<"scheduled" | "played">("scheduled");
   const [mobileView, setMobileView] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(max-width: 760px)").matches : false,
   );
@@ -239,6 +261,7 @@ export function MatchesPage() {
 
   if (error) return <p role="alert">Erreur : {error}</p>;
   if (loading || !data) return <p>Chargement…</p>;
+  const seasonLabel = data.players.seasonLabel?.trim() || "Maika";
 
   const map = playerById(data.players.players);
   const list = [...data.matches.matches].sort((a, b) => b.date.localeCompare(a.date));
@@ -291,19 +314,19 @@ export function MatchesPage() {
 
   return (
     <main>
-      <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>Parties</h2>
+      <MaikaPointsHelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} seasonLabel={seasonLabel} buildNumber={BUILD_NUMBER} />
       {deleteError ? (
         <p role="alert" style={{ color: "var(--danger)", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
           {deleteError}
         </p>
       ) : null}
-      {canManageLeague ? (
+      {canManageLeague && !mobileView ? (
         <div style={{ display: "flex", gap: 8, marginBottom: "0.8rem", flexWrap: "wrap" }}>
           <IconActionButton
             label="Ajouter une partie"
             icon={Plus}
             iconSize={20}
-            style={{ ...iconButtonBaseStyle, ...buttonPrimary, border: "none" }}
+            style={{ ...iconButtonBaseStyle, ...addButtonPillStyle }}
             onClick={() => {
               setMatchCreateError(null);
               setMatchCreateOpen(true);
@@ -313,43 +336,104 @@ export function MatchesPage() {
       ) : null}
       {role === "user" ? (
         <>
-          <section style={{ marginBottom: "1.35rem" }}>
-            <h3 style={userSectionHeadingStyle}>Parties prévues</h3>
-            <UserMatchesTable
-              matches={userScheduledMatches}
-              map={map}
-              debugByMatchId={debugByMatchId}
-              emptyLabel="Aucune partie prévue."
-              mobileView={mobileView}
-            />
-          </section>
-          <section>
-            <h3 style={userSectionHeadingStyle}>Dernières parties</h3>
-            <UserMatchesTable
-              matches={userPlayedShown}
-              map={map}
-              debugByMatchId={debugByMatchId}
-              emptyLabel="Aucune partie jouée pour le moment."
-              mobileView={mobileView}
-            />
-            {userPlayedMatchesDesc.length > 3 ? (
-              <div style={{ marginTop: "0.75rem" }}>
+          {mobileView ? (
+            <>
+              <div style={mobileTabsWrapStyle}>
                 <button
                   type="button"
-                  onClick={() => setUserPlayedHistoryExpanded((v) => !v)}
-                  style={{ ...iconButtonBaseStyle, ...buttonSecondary, padding: "0.45rem 0.9rem", fontWeight: 600 }}
-                  aria-expanded={userPlayedHistoryExpanded}
-                  aria-label={
-                    userPlayedHistoryExpanded
-                      ? "Réduire et n’afficher que les trois dernières parties"
-                      : "Afficher tout l’historique des parties jouées"
-                  }
+                  onClick={() => setMobileUserSection("scheduled")}
+                  aria-pressed={mobileUserSection === "scheduled"}
+                  style={{ ...mobileTabStyle, ...(mobileUserSection === "scheduled" ? mobileTabActiveStyle : null) }}
                 >
-                  {userPlayedHistoryExpanded ? "Moins" : "Plus"}
+                  Prévues
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileUserSection("played")}
+                  aria-pressed={mobileUserSection === "played"}
+                  style={{ ...mobileTabStyle, ...(mobileUserSection === "played" ? mobileTabActiveStyle : null) }}
+                >
+                  Jouées
                 </button>
               </div>
-            ) : null}
-          </section>
+              {mobileUserSection === "scheduled" ? (
+                <UserMatchesTable
+                  matches={userScheduledMatches}
+                  map={map}
+                  debugByMatchId={debugByMatchId}
+                  emptyLabel="Aucune partie prévue."
+                  mobileView={mobileView}
+                />
+              ) : (
+                <>
+                  <UserMatchesTable
+                    matches={userPlayedShown}
+                    map={map}
+                    debugByMatchId={debugByMatchId}
+                    emptyLabel="Aucune partie jouée pour le moment."
+                    mobileView={mobileView}
+                  />
+                  {userPlayedMatchesDesc.length > 3 ? (
+                    <div style={{ marginTop: "0.75rem" }}>
+                      <button
+                        type="button"
+                        onClick={() => setUserPlayedHistoryExpanded((v) => !v)}
+                        style={{ ...iconButtonBaseStyle, ...buttonSecondary, padding: "0.45rem 0.9rem", fontWeight: 600 }}
+                        aria-expanded={userPlayedHistoryExpanded}
+                        aria-label={
+                          userPlayedHistoryExpanded
+                            ? "Réduire et n’afficher que les trois dernières parties"
+                            : "Afficher tout l’historique des parties jouées"
+                        }
+                      >
+                        {userPlayedHistoryExpanded ? "Moins" : "Plus"}
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <section style={{ marginBottom: "1.35rem" }}>
+                <h3 style={userSectionHeadingStyle}>Parties prévues</h3>
+                <UserMatchesTable
+                  matches={userScheduledMatches}
+                  map={map}
+                  debugByMatchId={debugByMatchId}
+                  emptyLabel="Aucune partie prévue."
+                  mobileView={mobileView}
+                />
+              </section>
+              <section>
+                <h3 style={userSectionHeadingStyle}>Dernières parties</h3>
+                <UserMatchesTable
+                  matches={userPlayedShown}
+                  map={map}
+                  debugByMatchId={debugByMatchId}
+                  emptyLabel="Aucune partie jouée pour le moment."
+                  mobileView={mobileView}
+                />
+                {userPlayedMatchesDesc.length > 3 ? (
+                  <div style={{ marginTop: "0.75rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => setUserPlayedHistoryExpanded((v) => !v)}
+                      style={{ ...iconButtonBaseStyle, ...buttonSecondary, padding: "0.45rem 0.9rem", fontWeight: 600 }}
+                      aria-expanded={userPlayedHistoryExpanded}
+                      aria-label={
+                        userPlayedHistoryExpanded
+                          ? "Réduire et n’afficher que les trois dernières parties"
+                          : "Afficher tout l’historique des parties jouées"
+                      }
+                    >
+                      {userPlayedHistoryExpanded ? "Moins" : "Plus"}
+                    </button>
+                  </div>
+                ) : null}
+              </section>
+            </>
+          )}
         </>
       ) : mobileView ? (
         <div style={mobileListStyle}>
@@ -359,33 +443,8 @@ export function MatchesPage() {
               m={m}
               map={map}
               debug={debugByMatchId.get(m.id)}
-              actions={
-                canManageLeague ? (
-                  <>
-                    <IconActionButton
-                      label={`Modifier la partie du ${m.date} dans un nouvel onglet`}
-                      icon={Pencil}
-                      iconSize={18}
-                      style={{ ...iconButtonBaseStyle, ...buttonSecondary }}
-                      onClick={() => openAppPathInNewWindow(`/parties/${encodeURIComponent(m.id)}/modifier`)}
-                    />
-                    <button
-                      type="button"
-                      style={{ ...iconButtonBaseStyle, ...buttonDanger }}
-                      disabled={deletingId !== null}
-                      onClick={() => void deleteMatch(m)}
-                      aria-label={`Supprimer la partie du ${m.date}`}
-                      title="Supprimer la partie"
-                    >
-                      {deletingId === m.id ? (
-                        <Loader2 size={18} strokeWidth={2} className="animate-icon-spin" aria-hidden focusable={false} />
-                      ) : (
-                        <Trash2 size={18} strokeWidth={2} aria-hidden focusable={false} />
-                      )}
-                    </button>
-                  </>
-                ) : null
-              }
+              clickable={canManageLeague}
+              onClick={canManageLeague ? () => openAppPathInNewWindow(`/parties/${encodeURIComponent(m.id)}/modifier`) : undefined}
             />
           ))}
         </div>
@@ -489,6 +548,32 @@ export function MatchesPage() {
           </div>
         </div>
       ) : null}
+      <button
+        type="button"
+        onClick={() => setHelpOpen(true)}
+        aria-label="Informations"
+        title={`Informations — Saison ${seasonLabel} · Build ${BUILD_NUMBER}`}
+        style={{
+          ...floatingInfoButtonStyle,
+          bottom: mobileView ? "calc(5.6rem + env(safe-area-inset-bottom))" : "0.9rem",
+        }}
+      >
+        <CircleHelp size={20} strokeWidth={2} aria-hidden focusable={false} />
+      </button>
+      {canManageLeague && mobileView ? (
+        <div style={mobileFloatingActionWrapStyle}>
+          <IconActionButton
+            label="Ajouter une partie"
+            icon={Plus}
+            iconSize={20}
+            style={{ ...iconButtonBaseStyle, ...addButtonPillStyle, padding: "0.52rem 0.95rem", minHeight: "2.65rem" }}
+            onClick={() => {
+              setMatchCreateError(null);
+              setMatchCreateOpen(true);
+            }}
+          />
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -507,6 +592,14 @@ const buttonPrimary: CSSProperties = {
   background: "var(--accent)",
   color: "var(--on-accent)",
   fontWeight: 700,
+};
+const addButtonPillStyle: CSSProperties = {
+  borderRadius: 999,
+  border: "1px solid color-mix(in srgb, var(--accent) 22%, var(--border))",
+  background: "var(--surface)",
+  color: "var(--nav-active-text)",
+  boxShadow: "var(--shadow-sm)",
+  fontWeight: 600,
 };
 const buttonSecondary: CSSProperties = {
   border: "1px solid var(--border-strong)",
@@ -528,12 +621,28 @@ const mobileCardStyle: CSSProperties = {
   background: "var(--surface)",
   boxShadow: "var(--shadow-sm)",
 };
-const mobileActionsStyle: CSSProperties = {
-  marginTop: 8,
+const mobileCardClickableStyle: CSSProperties = { cursor: "pointer" };
+const mobileMetaLineStyle: CSSProperties = {
+  fontSize: "0.82rem",
+  color: "var(--muted)",
+  lineHeight: 1.35,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+const mobileDateInlineStyle: CSSProperties = {
+  color: "var(--text)",
+  fontWeight: 600,
+};
+const mobileFloatingActionWrapStyle: CSSProperties = {
+  position: "fixed",
+  left: "0.75rem",
+  right: "0.75rem",
+  bottom: "calc(5.2rem + env(safe-area-inset-bottom))",
+  /** Au-dessus de la barre de navigation mobile (z-index 1200) pour que le clic ne soit pas intercepté. */
+  zIndex: 1208,
   display: "flex",
-  justifyContent: "flex-end",
-  gap: 8,
-  flexWrap: "wrap",
+  justifyContent: "center",
 };
 
 const matchModalOverlayStyle: CSSProperties = {
@@ -544,7 +653,8 @@ const matchModalOverlayStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   padding: "1rem",
-  zIndex: 50,
+  /** Au-dessus du shell mobile (barre ~1200) pour que la modale soit utilisable. */
+  zIndex: 1300,
 };
 
 const matchModalDialogStyle: CSSProperties = {
@@ -574,6 +684,50 @@ const userSectionHeadingStyle: CSSProperties = {
   fontWeight: 700,
   margin: "0 0 0.5rem",
   color: "var(--text)",
+};
+const mobileTabsWrapStyle: CSSProperties = {
+  display: "flex",
+  gap: 6,
+  flexWrap: "nowrap",
+  marginBottom: "0.75rem",
+  padding: 4,
+  borderRadius: 999,
+  border: "1px solid var(--border)",
+  background: "color-mix(in srgb, var(--bg) 65%, var(--surface))",
+};
+const mobileTabStyle: CSSProperties = {
+  border: "1px solid transparent",
+  background: "transparent",
+  color: "var(--text)",
+  borderRadius: 999,
+  padding: "0.42rem 0.9rem",
+  fontWeight: 600,
+  cursor: "pointer",
+  minHeight: "2.5rem",
+  flex: "1 1 0",
+};
+const mobileTabActiveStyle: CSSProperties = {
+  background: "var(--surface)",
+  color: "var(--nav-active-text)",
+  boxShadow: "var(--shadow-sm)",
+  borderColor: "color-mix(in srgb, var(--accent) 22%, var(--border))",
+};
+const floatingInfoButtonStyle: CSSProperties = {
+  position: "fixed",
+  right: "0.85rem",
+  bottom: "0.9rem",
+  zIndex: 60,
+  width: 46,
+  height: 46,
+  borderRadius: 999,
+  border: "1px solid var(--border-strong)",
+  background: "var(--surface)",
+  color: "var(--text)",
+  boxShadow: "var(--shadow-md)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
 };
 
 function UserMatchesTable({

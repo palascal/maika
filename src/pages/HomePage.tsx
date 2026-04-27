@@ -1,5 +1,5 @@
 import { Award, Medal } from "lucide-react";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { playerCompactName } from "../domain/format";
 import { playerIsActive } from "../domain/playerActive";
@@ -39,6 +39,18 @@ export function HomePage() {
   const { data, error, loading } = useSeasonData();
   const { role, session } = useAuth();
   const [selectedPoste, setSelectedPoste] = useState<Player["poste"]>("avant");
+  const [mobileView, setMobileView] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 760px)").matches : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 760px)");
+    const onChange = () => setMobileView(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const playedCountByPlayer = useMemo(() => {
     const out = new Map<string, number>();
@@ -98,7 +110,7 @@ export function HomePage() {
   const selectedRows = selectedPoste === "avant" ? { demi: demiA, barrage: barrageA, other: otherA } : { demi: demiAr, barrage: barrageAr, other: otherAr };
 
   return (
-    <main>
+    <main style={mobileView ? mobileMainStyle : undefined}>
       {role === "user" && linkedPlayer ? (
         <section style={{ marginBottom: "1.35rem" }}>
           <h2 style={{ fontSize: "1.05rem", marginTop: 0, marginBottom: "0.55rem" }}>Mon Classement</h2>
@@ -132,7 +144,16 @@ export function HomePage() {
       ) : null}
 
       <section style={{ marginBottom: "1.5rem" }}>
-        <div style={posteTabsWrapStyle}>
+        <div
+          style={
+            mobileView
+              ? {
+                  ...posteTabsWrapStyle,
+                  ...floatingTabsWrapStyle,
+                }
+              : posteTabsWrapStyle
+          }
+        >
           <button
             type="button"
             onClick={() => setSelectedPoste("avant")}
@@ -216,25 +237,49 @@ function toneCardStyle(tone: "top2" | "barrage" | "other"): CSSProperties {
 
 const posteTabsWrapStyle: CSSProperties = {
   display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
+  gap: 6,
+  flexWrap: "nowrap",
   marginBottom: "0.75rem",
+  padding: 4,
+  borderRadius: 999,
+  border: "1px solid var(--border)",
+  background: "color-mix(in srgb, var(--bg) 65%, var(--surface))",
 };
 
 const posteTabStyle: CSSProperties = {
-  border: "1px solid var(--border-strong)",
+  border: "1px solid transparent",
   background: "transparent",
   color: "var(--text)",
-  borderRadius: 10,
-  padding: "0.45rem 0.85rem",
+  borderRadius: 999,
+  padding: "0.42rem 0.9rem",
   fontWeight: 600,
   cursor: "pointer",
   minHeight: "2.5rem",
+  flex: "1 1 0",
 };
 
 const posteTabActiveStyle: CSSProperties = {
-  background: "var(--nav-active-bg)",
+  background: "var(--surface)",
   color: "var(--nav-active-text)",
+  boxShadow: "var(--shadow-sm)",
+  borderColor: "color-mix(in srgb, var(--accent) 22%, var(--border))",
+};
+const mobileMainStyle: CSSProperties = {
+  paddingBottom: "calc(9.2rem + env(safe-area-inset-bottom))",
+};
+const floatingTabsWrapStyle: CSSProperties = {
+  position: "fixed",
+  left: "0.75rem",
+  right: "0.75rem",
+  bottom: "calc(5.2rem + env(safe-area-inset-bottom))",
+  zIndex: 55,
+  marginBottom: 0,
+  padding: "0.35rem",
+  borderRadius: 999,
+  border: "1px solid color-mix(in srgb, var(--border) 80%, transparent)",
+  background: "color-mix(in srgb, var(--surface) 88%, transparent)",
+  backdropFilter: "blur(4px)",
+  boxShadow: "var(--shadow-md)",
 };
 
 const zonesWrapStyle: CSSProperties = {

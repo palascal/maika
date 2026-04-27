@@ -1,8 +1,7 @@
-import { Loader2, Save, X } from "lucide-react";
+import { Loader2, Save, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { iconButtonBaseStyle } from "../components/IconActionButton";
-import { AppLink } from "../navigation/AppLink";
 import { useAuth } from "../auth/AuthContext";
 import {
   formatMatchHourDisplay,
@@ -12,6 +11,7 @@ import {
 import { playerIsActive } from "../domain/playerActive";
 import { playerCompactName } from "../domain/format";
 import type { Match, MatchStatus, MatchesFile, Player, PlayerId } from "../domain/types";
+import { AppLink } from "../navigation/AppLink";
 import { useSeasonData } from "../season/SeasonDataContext";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -73,14 +73,15 @@ export function MatchFormPage() {
     }
   }
 
+  async function removeEditingMatch() {
+    if (!matchId) return;
+    if (!window.confirm("Supprimer cette partie ?")) return;
+    const nextMatches = data.matches.matches.filter((m) => m.id !== matchId);
+    await persist(nextMatches);
+  }
+
   return (
     <main>
-      <p style={{ marginTop: 0, marginBottom: "0.75rem" }}>
-        <AppLink to="/parties" style={backLinkStyle}>
-          ← Retour aux parties
-        </AppLink>
-      </p>
-      <h2 style={{ fontSize: "1.15rem", marginTop: 0, fontWeight: 700, letterSpacing: "-0.02em" }}>Modifier la partie</h2>
       {saveError ? <p role="alert" style={{ color: "var(--danger)", margin: "0 0 1rem" }}>{saveError}</p> : null}
       <MatchForm
         players={players}
@@ -90,6 +91,7 @@ export function MatchFormPage() {
         saving={saving}
         onSubmit={persist}
         onCancel={() => navigate("/parties")}
+        onDelete={removeEditingMatch}
       />
     </main>
   );
@@ -103,6 +105,7 @@ export function MatchForm({
   saving,
   onSubmit,
   onCancel,
+  onDelete,
   embeddedInModal,
 }: {
   players: Player[];
@@ -112,6 +115,7 @@ export function MatchForm({
   saving: boolean;
   onSubmit: (matches: Match[]) => Promise<void>;
   onCancel?: () => void;
+  onDelete?: () => Promise<void> | void;
   /** Formulaire dans une fenêtre modale (même look & feel que l’admin joueurs). */
   embeddedInModal?: boolean;
 }) {
@@ -133,7 +137,6 @@ export function MatchForm({
   const [date, setDate] = useState(editingMatch?.date ?? today());
   const [time, setTime] = useState(normalizeMatchHour(editingMatch?.time));
   const [venue, setVenue] = useState(editingMatch?.venue?.trim() ? editingMatch.venue : VENUE_NONE);
-  const [status, setStatus] = useState<MatchStatus>(editingMatch?.status ?? "scheduled");
   const [teamA_player1, setTeamA_player1] = useState(initialSlots.a1);
   const [teamA_player2, setTeamA_player2] = useState(initialSlots.a2);
   const [teamB_player1, setTeamB_player1] = useState(initialSlots.b1);
@@ -162,7 +165,6 @@ export function MatchForm({
     setDate(editingMatch.date);
     setTime(normalizeMatchHour(editingMatch.time));
     setVenue(editingMatch.venue?.trim() ? editingMatch.venue : VENUE_NONE);
-    setStatus(editingMatch.status);
     setTeamA_player1(editingMatch.teamA[0] ?? "");
     setTeamA_player2(editingMatch.teamA[1] ?? "");
     setTeamB_player1(editingMatch.teamB[0] ?? "");
@@ -181,6 +183,15 @@ export function MatchForm({
     }
     if (!teamA_player1 || !teamA_player2 || !teamB_player1 || !teamB_player2) return;
     const venueTrim = venue.trim();
+    const scoreATrim = scoreTeamA.trim();
+    const scoreBTrim = scoreTeamB.trim();
+    const hasAnyScore = scoreATrim.length > 0 || scoreBTrim.length > 0;
+    const hasBothScores = scoreATrim.length > 0 && scoreBTrim.length > 0;
+    if (hasAnyScore && !hasBothScores) {
+      setFormError("Renseignez les deux scores, ou laissez les deux champs vides.");
+      return;
+    }
+    let status: MatchStatus = editingMatch?.status === "cancelled" ? "cancelled" : "scheduled";
     const base: Match = {
       id: editingMatch?.id ?? `match-${Date.now()}`,
       seasonId: editingMatch?.seasonId ?? normalizedSeasonId,
@@ -192,12 +203,17 @@ export function MatchForm({
     if (venueTrim && venueTrim !== VENUE_NONE) base.venue = venueTrim;
     const t = time.trim();
     if (t) base.time = t;
-    if (status === "played") {
-      const a = Number(scoreTeamA);
-      const b = Number(scoreTeamB);
+    if (hasBothScores) {
+      const a = Number(scoreATrim);
+      const b = Number(scoreBTrim);
       if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+      status = "played";
+      base.status = status;
       base.scoreTeamA = Math.round(a);
       base.scoreTeamB = Math.round(b);
+    } else {
+      delete base.scoreTeamA;
+      delete base.scoreTeamB;
     }
     const next = editingMatch ? matches.map((m) => (m.id === editingMatch.id ? base : m)) : [...matches, base];
     await onSubmit(next);
@@ -254,20 +270,11 @@ export function MatchForm({
               ))}
             </select>
           </label>
-          <label style={labelCompactStyle}>
-            <span style={labelSpanStyle}>Statut</span>
-            <select value={status} disabled={saving} onChange={(e) => setStatus(e.target.value as MatchStatus)} style={inputStyle}>
-              <option value="scheduled">Prévue</option>
-              <option value="played">Jouée</option>
-              <option value="cancelled">Annulée</option>
-            </select>
-          </label>
         </div>
       </section>
 
       <div style={teamsRowStyle}>
         <TeamCard
-          title="Équipe 1"
           accent="var(--accent)"
           player1Id={teamA_player1}
           player2Id={teamA_player2}
@@ -277,13 +284,14 @@ export function MatchForm({
           excludedPlayer1={otherIds("a1")}
           excludedPlayer2={otherIds("a2")}
           saving={saving}
-          status={status}
           score={scoreTeamA}
           onScore={setScoreTeamA}
-          scoreLabel="Points (40) — équipe 1"
+          scoreLabel="Score"
         />
+        <div style={vsBadgeWrapStyle} aria-hidden>
+          <span style={vsBadgeStyle}>VS</span>
+        </div>
         <TeamCard
-          title="Équipe 2"
           accent="#94a3b8"
           player1Id={teamB_player1}
           player2Id={teamB_player2}
@@ -293,10 +301,9 @@ export function MatchForm({
           excludedPlayer1={otherIds("b1")}
           excludedPlayer2={otherIds("b2")}
           saving={saving}
-          status={status}
           score={scoreTeamB}
           onScore={setScoreTeamB}
-          scoreLabel="Points (40) — équipe 2"
+          scoreLabel="Score"
         />
       </div>
 
@@ -322,6 +329,18 @@ export function MatchForm({
             <X size={20} strokeWidth={2} aria-hidden focusable={false} />
           </button>
         ) : null}
+        {editingMatch && onDelete ? (
+          <button
+            type="button"
+            disabled={saving}
+            aria-label="Supprimer la partie"
+            title="Supprimer la partie"
+            style={{ ...iconButtonBaseStyle, ...buttonDanger, padding: "0.55rem 0.85rem" }}
+            onClick={() => void onDelete()}
+          >
+            <Trash2 size={20} strokeWidth={2} aria-hidden focusable={false} />
+          </button>
+        ) : null}
         <button
           type="submit"
           disabled={saving}
@@ -341,7 +360,6 @@ export function MatchForm({
 }
 
 function TeamCard({
-  title,
   accent,
   player1Id,
   player2Id,
@@ -351,12 +369,10 @@ function TeamCard({
   excludedPlayer1,
   excludedPlayer2,
   saving,
-  status,
   score,
   onScore,
   scoreLabel,
 }: {
-  title: string;
   accent: string;
   player1Id: string;
   player2Id: string;
@@ -366,42 +382,42 @@ function TeamCard({
   excludedPlayer1: string[];
   excludedPlayer2: string[];
   saving: boolean;
-  status: MatchStatus;
   score: string;
   onScore: (v: string) => void;
   scoreLabel: string;
 }) {
   return (
     <div style={{ ...teamCardStyle, borderColor: "color-mix(in srgb, var(--muted) 55%, transparent)" }}>
-      <div style={{ ...teamCardHeaderStyle, borderLeftColor: accent }}>{title}</div>
-      <div style={playersGridStyle}>
-        <label style={labelCompactStyle}>
-          <span style={labelSpanStyle}>Joueur 1</span>
-          <PlayerSelect
-            players={players}
-            value={player1Id}
-            setValue={onPlayer1}
-            saving={saving}
-            excludedIds={excludedPlayer1}
-          />
-        </label>
-        <label style={labelCompactStyle}>
-          <span style={labelSpanStyle}>Joueur 2</span>
-          <PlayerSelect
-            players={players}
-            value={player2Id}
-            setValue={onPlayer2}
-            saving={saving}
-            excludedIds={excludedPlayer2}
-          />
+      <div style={{ ...teamCardHeaderStyle, borderLeftColor: accent }} />
+      <div style={teamCardBodyStyle}>
+        <div style={teamPlayersColumnStyle}>
+          <div style={labelSpanStyle}>Joueurs</div>
+          <div style={playersStackStyle}>
+            <label style={labelCompactStyle}>
+              <PlayerSelect
+                players={players}
+                value={player1Id}
+                setValue={onPlayer1}
+                saving={saving}
+                excludedIds={excludedPlayer1}
+              />
+            </label>
+            <label style={labelCompactStyle}>
+              <PlayerSelect
+                players={players}
+                value={player2Id}
+                setValue={onPlayer2}
+                saving={saving}
+                excludedIds={excludedPlayer2}
+              />
+            </label>
+          </div>
+        </div>
+        <label style={teamScoreColumnStyle}>
+          <span style={labelSpanStyle}>{scoreLabel}</span>
+          <input type="number" value={score} disabled={saving} onChange={(e) => onScore(e.target.value)} style={scoreInputStyle} />
         </label>
       </div>
-      {status === "played" ? (
-        <label style={{ ...labelCompactStyle, marginTop: 10 }}>
-          <span style={labelSpanStyle}>{scoreLabel}</span>
-          <input type="number" value={score} disabled={saving} onChange={(e) => onScore(e.target.value)} required style={inputStyle} />
-        </label>
-      ) : null}
     </div>
   );
 }
@@ -435,7 +451,6 @@ function PlayerSelect({
   );
 }
 
-const backLinkStyle: CSSProperties = { fontWeight: 600, textDecoration: "none" };
 const formStyle: CSSProperties = {
   marginTop: "0.35rem",
   background: "var(--surface)",
@@ -447,14 +462,40 @@ const formStyle: CSSProperties = {
 const metaSectionStyle: CSSProperties = { marginBottom: "1rem" };
 const metaGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(9.5rem, 1fr))",
-  gap: "0.65rem 0.75rem",
+  gridTemplateColumns: "minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr)",
+  gap: "0.55rem",
+  alignItems: "end",
 };
 const teamsRowStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 17rem), 1fr))",
   gap: "0.85rem",
   alignItems: "stretch",
+  position: "relative",
+};
+const vsBadgeWrapStyle: CSSProperties = {
+  gridColumn: "1 / -1",
+  display: "flex",
+  justifyContent: "center",
+  marginTop: "-0.15rem",
+  marginBottom: "-0.15rem",
+  pointerEvents: "none",
+  zIndex: 2,
+};
+const vsBadgeStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minWidth: "2.2rem",
+  height: "2.2rem",
+  borderRadius: 999,
+  border: "1px solid color-mix(in srgb, var(--accent) 45%, var(--border))",
+  background: "color-mix(in srgb, var(--surface) 80%, var(--bg))",
+  boxShadow: "var(--shadow-sm)",
+  fontSize: "0.78rem",
+  fontWeight: 800,
+  letterSpacing: "0.08em",
+  color: "var(--muted)",
 };
 const teamCardStyle: CSSProperties = {
   borderRadius: 12,
@@ -463,19 +504,29 @@ const teamCardStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--bg) 55%, var(--surface))",
 };
 const teamCardHeaderStyle: CSSProperties = {
-  fontSize: "0.72rem",
-  fontWeight: 800,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "var(--muted)",
-  marginBottom: "0.65rem",
-  paddingLeft: 10,
+  marginBottom: "0.45rem",
   borderLeft: "3px solid",
+  minHeight: 0,
 };
-const playersGridStyle: CSSProperties = {
+const teamCardBodyStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 10rem), 1fr))",
+  gridTemplateColumns: "minmax(0, 1fr) minmax(4.8rem, 5.6rem)",
   gap: "0.65rem",
+  alignItems: "start",
+};
+const teamPlayersColumnStyle: CSSProperties = {
+  minWidth: 0,
+};
+const playersStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "0.55rem",
+  marginTop: 5,
+};
+const teamScoreColumnStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 5,
+  minWidth: 0,
 };
 const labelCompactStyle: CSSProperties = {
   display: "flex",
@@ -499,6 +550,11 @@ const inputStyle: CSSProperties = {
   fontSize: "0.95rem",
   minHeight: "2.55rem",
 };
+const scoreInputStyle: CSSProperties = {
+  ...inputStyle,
+  textAlign: "center",
+  paddingInline: "0.35rem",
+};
 const buttonPrimary: CSSProperties = {
   padding: "0.55rem 1.1rem",
   borderRadius: 10,
@@ -517,6 +573,17 @@ const buttonSecondary: CSSProperties = {
   background: "transparent",
   color: "var(--text)",
   fontWeight: 600,
+  cursor: "pointer",
+  minHeight: "2.75rem",
+  fontSize: "0.95rem",
+};
+const buttonDanger: CSSProperties = {
+  padding: "0.55rem 1.1rem",
+  borderRadius: 10,
+  border: "1px solid color-mix(in srgb, var(--danger) 45%, var(--border))",
+  background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
+  color: "var(--danger)",
+  fontWeight: 700,
   cursor: "pointer",
   minHeight: "2.75rem",
   fontSize: "0.95rem",
