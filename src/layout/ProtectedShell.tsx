@@ -1,5 +1,5 @@
-import { CircleHelp, UserRound } from "lucide-react";
-import { useState } from "react";
+import { CalendarDays, CircleHelp, House, LogOut, Settings, UserRound, Users } from "lucide-react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Outlet } from "react-router-dom";
 import { MaikaPointsHelpDialog } from "../components/MaikaPointsHelpDialog";
 import { BUILD_NUMBER } from "../buildInfo";
@@ -57,9 +57,22 @@ export function ProtectedShell() {
 
 function ProtectedShellContent() {
   const { session, logout } = useAuth();
-  const { data } = useSeasonData();
+  const { data, loading } = useSeasonData();
+  const { canManageLeague, canAccessConfig } = useAuth();
   const seasonLabel = data?.players.seasonLabel?.trim() || "Maika";
   const [maikaHelpOpen, setMaikaHelpOpen] = useState(false);
+  const [mobileView, setMobileView] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 760px)").matches : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 760px)");
+    const onChange = () => setMobileView(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const helpButtonStyle = {
     display: "inline-flex" as const,
@@ -76,6 +89,60 @@ function ProtectedShellContent() {
     cursor: "pointer" as const,
     background: maikaHelpOpen ? "var(--nav-active-bg)" : "transparent",
   };
+
+  if (mobileView) {
+    return (
+      <>
+        <MaikaPointsHelpDialog
+          open={maikaHelpOpen}
+          onClose={() => setMaikaHelpOpen(false)}
+          seasonLabel={seasonLabel}
+          buildNumber={BUILD_NUMBER}
+        />
+        <div style={mobileContentWrapStyle}>
+          <Outlet />
+        </div>
+        <nav style={mobileBottomBarStyle} aria-label="Navigation principale mobile">
+          <ShellNavLink to="/" end title="Classement" aria-label="Classement" style={mobileNavLinkStyle}>
+            {({ isActive }) => <House size={19} strokeWidth={2} aria-hidden focusable={false} style={{ opacity: isActive ? 1 : 0.86 }} />}
+          </ShellNavLink>
+          <ShellNavLink to="/parties" title="Parties" aria-label="Parties" style={mobileNavLinkStyle}>
+            {({ isActive }) => (
+              <CalendarDays size={19} strokeWidth={2} aria-hidden focusable={false} style={{ opacity: isActive ? 1 : 0.86 }} />
+            )}
+          </ShellNavLink>
+          {canManageLeague ? (
+            <ShellNavLink to="/admin/joueurs" title="Joueurs" aria-label="Joueurs" style={mobileNavLinkStyle}>
+              {({ isActive }) => <Users size={19} strokeWidth={2} aria-hidden focusable={false} style={{ opacity: isActive ? 1 : 0.86 }} />}
+            </ShellNavLink>
+          ) : null}
+          {canAccessConfig ? (
+            <ShellNavLink to="/config" title="Config" aria-label="Config" style={mobileNavLinkStyle}>
+              {({ isActive }) => (
+                <Settings size={19} strokeWidth={2} aria-hidden focusable={false} style={{ opacity: isActive ? 1 : 0.86 }} />
+              )}
+            </ShellNavLink>
+          ) : null}
+          <button
+            type="button"
+            title={`Infos (${loading ? "Chargement" : `Saison ${seasonLabel} · Build ${BUILD_NUMBER}`})`}
+            aria-label="Informations barème, saison et build"
+            aria-expanded={maikaHelpOpen}
+            onClick={() => setMaikaHelpOpen(true)}
+            style={mobileIconButtonStyle}
+          >
+            <CircleHelp size={19} strokeWidth={2} aria-hidden focusable={false} style={{ opacity: maikaHelpOpen ? 1 : 0.86 }} />
+          </button>
+          <ShellNavLink to="/profil" title="Profil" aria-label="Profil" style={mobileNavLinkStyle}>
+            {({ isActive }) => <UserRound size={19} strokeWidth={2} aria-hidden focusable={false} style={{ opacity: isActive ? 1 : 0.86 }} />}
+          </ShellNavLink>
+          <button type="button" title="Déconnexion" aria-label="Déconnexion" onClick={() => void logout()} style={mobileIconButtonStyle}>
+            <LogOut size={19} strokeWidth={2} aria-hidden focusable={false} />
+          </button>
+        </nav>
+      </>
+    );
+  }
 
   return (
     <>
@@ -146,3 +213,53 @@ function ProtectedShellContent() {
     </>
   );
 }
+
+const mobileContentWrapStyle: CSSProperties = {
+  paddingBottom: "calc(5.2rem + env(safe-area-inset-bottom))",
+};
+
+const mobileBottomBarStyle: CSSProperties = {
+  position: "fixed",
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 1200,
+  display: "flex",
+  justifyContent: "space-around",
+  alignItems: "center",
+  gap: 4,
+  padding: "0.45rem 0.45rem calc(0.45rem + env(safe-area-inset-bottom))",
+  borderTop: "1px solid var(--border)",
+  background: "var(--surface)",
+  boxShadow: "0 -6px 18px color-mix(in srgb, var(--text) 10%, transparent)",
+};
+
+const mobileNavLinkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
+  width: 42,
+  height: 42,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 10,
+  border: "1px solid var(--border-strong)",
+  color: "var(--text)",
+  textDecoration: "none",
+  background: isActive ? "var(--nav-active-bg)" : "transparent",
+  lineHeight: 0,
+  flexShrink: 0,
+});
+
+const mobileIconButtonStyle: CSSProperties = {
+  width: 42,
+  height: 42,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 10,
+  border: "1px solid var(--border-strong)",
+  background: "transparent",
+  color: "var(--text)",
+  lineHeight: 0,
+  cursor: "pointer",
+  flexShrink: 0,
+};
